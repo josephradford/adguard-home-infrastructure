@@ -1,0 +1,618 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  COMPOSE_PROJECT_NAME: adguard-release
+
+permissions:
+  contents: write
+  packages: write
+  releases: write
+
+jobs:
+  # Validate release
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version format
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+
+          echo "Validating version: $VERSION"
+
+          # Check semantic versioning format
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
+            echo "ERROR: Invalid version format. Use semantic versioning (e.g., v1.0.0)"
+            exit 1
+          fi
+
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Check for required files
+        run: |
+          required_files=(
+            "README.md"
+            "CHANGELOG.md"
+            "docker/docker-compose.yml"
+            ".env.example"
+            "Makefile"
+          )
+
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "ERROR: Required file missing: $file"
+              exit 1
+            fi
+          done
+
+      - name: Validate changelog
+        run: |
+          if [ ! -f "CHANGELOG.md" ]; then
+            echo "Creating basic CHANGELOG.md..."
+            cat > CHANGELOG.md << EOF
+          # Changelog
+
+          All notable changes to this project will be documented in this file.
+
+          ## [$VERSION] - $(date +%Y-%m-%d)
+
+          ### Added
+          - Initial release of AdGuard Home Infrastructure
+          - Complete Docker Compose stack with monitoring
+          - Security hardening configurations
+          - Automated backup and maintenance scripts
+          - Australian DNS optimization
+          EOF
+          else
+            echo "CHANGELOG.md exists"
+          fi
+
+  # Run full test suite
+  test:
+    name: Full Test Suite
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    needs: validate
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up test environment
+        run: |
+          cp .env.example .env
+          sed -i 's/ADGUARD_PASSWORD=change_this_password/ADGUARD_PASSWORD=release_test_password/' .env
+          sed -i 's/GRAFANA_ADMIN_PASSWORD=change_this_password/GRAFANA_ADMIN_PASSWORD=release_test_password/' .env
+          sed -i 's/GRAFANA_SECRET_KEY=change_this_secret/GRAFANA_SECRET_KEY=release_test_secret/' .env
+
+      - name: Run installation simulation
+        run: |
+          echo "Simulating installation process..."
+
+          # Create mock directories
+          sudo mkdir -p /opt/{adguard,monitoring,backups,logs}
+          sudo chown $USER:$USER /opt/{adguard,monitoring,backups,logs}
+
+          # Test script permissions
+          chmod +x scripts/**/*.sh
+          chmod +x configs/firewall/ufw-rules.sh
+
+          echo "Installation simulation completed"
+
+      - name: Test Docker stack
+        run: |
+          cd docker
+
+          # Pull all images
+          docker-compose pull
+
+          # Start services
+          docker-compose up -d
+
+          # Wait for services to be ready
+          echo "Waiting for services to initialize..."
+          sleep 90
+
+          # Test service health
+          timeout 120 bash -c 'until curl -f -s http://localhost:3000/; do sleep 5; done'
+          timeout 60 bash -c 'until curl -f -s http://localhost:9090/-/healthy; do sleep 5; done'
+          timeout 60 bash -c 'until curl -f -s http://localhost:3001/api/health; do sleep 5; done'
+
+          echo "All services are healthy"
+
+      - name: Test DNS functionality
+        run: |
+          echo "Testing DNS functionality..."
+
+          # Test basic DNS resolution
+          dig @localhost google.com A
+          dig @localhost cloudflare.com A
+
+          # Test DNS blocking
+          blocked_result=$(dig @localhost doubleclick.net +short | head -1 || echo "")
+          if [ "$blocked_result" = "0.0.0.0" ] || [ -z "$blocked_result" ]; then
+            echo "✓ DNS blocking is working"
+          else
+            echo "WARNING: DNS blocking test inconclusive"
+          fi
+
+          echo "DNS functionality tests completed"
+
+      - name: Test monitoring stack
+        run: |
+          echo "Testing monitoring functionality..."
+
+          # Test Prometheus metrics
+          curl -f "http://localhost:9090/api/v1/query?query=up" | jq '.data.result | length'
+
+          # Test AdGuard exporter
+          metrics_count=$(curl -s "http://localhost:9617/metrics" | grep -c "^adguard_" || echo "0")
+          echo "AdGuard metrics available: $metrics_count"
+
+          if [ "$metrics_count" -lt 5 ]; then
+            echo "WARNING: Limited AdGuard metrics available"
+          fi
+
+          echo "Monitoring stack tests completed"
+
+      - name: Performance validation
+        run: |
+          echo "Running performance validation..."
+
+          # Test DNS query performance
+          start_time=$(date +%s%N)
+          for i in {1..10}; do
+            dig @localhost "test$i.google.com" >/dev/null 2>&1
+          done
+          end_time=$(date +%s%N)
+
+          avg_time=$(( (end_time - start_time) / 10000000 ))  # Convert to ms
+          echo "Average DNS query time: ${avg_time}ms"
+
+          if [ "$avg_time" -gt 1000 ]; then
+            echo "WARNING: DNS queries slower than expected"
+          fi
+
+          # Check resource usage
+          docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"
+
+      - name: Cleanup test environment
+        if: always()
+        run: |
+          cd docker
+          docker-compose down -v
+          docker system prune -f
+
+  # Create release artifacts
+  build-artifacts:
+    name: Build Release Artifacts
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    needs: [validate, test]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set release version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Release version: $VERSION"
+
+      - name: Create release archive
+        run: |
+          echo "Creating release archive..."
+
+          # Create temporary directory for release
+          mkdir -p /tmp/adguard-home-infrastructure-$VERSION
+
+          # Copy all necessary files
+          rsync -av \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='*.log' \
+            --exclude='*.tmp' \
+            --exclude='data/' \
+            --exclude='volumes/' \
+            --exclude='backups/' \
+            . /tmp/adguard-home-infrastructure-$VERSION/
+
+          # Create version file
+          echo "$VERSION" > /tmp/adguard-home-infrastructure-$VERSION/VERSION
+
+          # Create installation instructions
+          cat > /tmp/adguard-home-infrastructure-$VERSION/INSTALL.txt << EOF
+          AdGuard Home Infrastructure $VERSION
+          ====================================
+
+          Quick Installation:
+          1. Extract this archive to /opt/adguard-infrastructure
+          2. Copy .env.example to .env and configure
+          3. Run: sudo make install
+
+          For detailed instructions, see docs/setup.md
+
+          System Requirements:
+          - Ubuntu 22.04 LTS (recommended)
+          - 2GB RAM minimum, 4GB recommended
+          - 20GB disk space
+          - Docker and docker-compose
+
+          Australian DNS Optimization:
+          This release is optimized for Australian networks with:
+          - Cloudflare Sydney PoP as primary DNS
+          - Quad9 and Google Sydney as backup
+          - Australian timezone (Australia/Sydney)
+          - Local network configuration for 192.168.1.0/24
+
+          Support:
+          - Documentation: docs/
+          - Issues: GitHub Issues
+          - Security: See SECURITY.md
+          EOF
+
+          # Create checksum files
+          cd /tmp/adguard-home-infrastructure-$VERSION
+          find . -type f -exec sha256sum {} \; > ../checksums.txt
+          mv ../checksums.txt .
+
+          # Create tarball
+          cd /tmp
+          tar -czf adguard-home-infrastructure-$VERSION.tar.gz adguard-home-infrastructure-$VERSION/
+
+          # Create zip archive for Windows users
+          zip -r adguard-home-infrastructure-$VERSION.zip adguard-home-infrastructure-$VERSION/
+
+          # Move to workspace
+          mv adguard-home-infrastructure-$VERSION.tar.gz $GITHUB_WORKSPACE/
+          mv adguard-home-infrastructure-$VERSION.zip $GITHUB_WORKSPACE/
+
+          echo "Release artifacts created"
+
+      - name: Generate release notes
+        run: |
+          cat > release-notes.md << 'EOF'
+          # AdGuard Home Infrastructure ${{ env.VERSION }}
+
+          A complete Infrastructure as Code solution for AdGuard Home DNS filtering with comprehensive monitoring and security hardening, optimized for Australian deployment.
+
+          ## 🚀 Features
+
+          ### Core Infrastructure
+          - **AdGuard Home** DNS filtering with Australian DNS optimization
+          - **Complete monitoring stack** (Prometheus, Grafana, Alertmanager)
+          - **Security hardening** with UFW firewall and Fail2ban
+          - **Automated backups** with encryption and retention management
+          - **Cloud-init provisioning** for Ubuntu 22.04 LTS
+
+          ### Australian Optimization
+          - Cloudflare Sydney PoP as primary DNS upstream
+          - Quad9 and Google Sydney as backup DNS servers
+          - Australia/Sydney timezone configuration
+          - Local network optimization for home use
+
+          ### Security Features
+          - Container security with non-root users and read-only filesystems
+          - SSH hardening with custom port and key-only authentication
+          - Firewall configuration with minimal required ports
+          - Fail2ban protection against brute force attacks
+          - Automated security updates
+          - File integrity monitoring with AIDE
+
+          ### Operational Excellence
+          - One-command installation with `make install`
+          - Comprehensive health monitoring and alerting
+          - Automated backup and recovery procedures
+          - CI/CD pipeline with security scanning
+          - Complete documentation and troubleshooting guides
+
+          ## 📋 System Requirements
+
+          - **OS**: Ubuntu 22.04 LTS (recommended)
+          - **RAM**: 2GB minimum, 4GB recommended
+          - **Storage**: 20GB minimum, 50GB recommended
+          - **Network**: Static IP configuration recommended
+          - **Dependencies**: Docker and docker-compose (installed automatically)
+
+          ## 🚀 Quick Start
+
+          1. **Download and extract** this release to your server
+          2. **Configure environment**: Copy `.env.example` to `.env` and customize
+          3. **Run installation**: `sudo make install`
+          4. **Access services**:
+             - AdGuard Home: http://192.168.1.100:3000
+             - Grafana: http://192.168.1.100:3001
+             - Prometheus: http://192.168.1.100:9090
+
+          ## 📊 What's Included
+
+          - **AdGuard Home**: DNS filtering with 15+ curated blocklists
+          - **Prometheus**: Metrics collection and alerting
+          - **Grafana**: Visualization dashboards
+          - **Node Exporter**: System metrics
+          - **AdGuard Exporter**: DNS-specific metrics
+          - **Alertmanager**: Multi-channel alert routing
+          - **Watchtower**: Automated container updates
+
+          ## 🔧 Management Commands
+
+          ```bash
+          make install    # Complete installation
+          make health     # Check system health
+          make backup     # Create backup
+          make update     # Update containers and system
+          make logs       # View service logs
+          make restart    # Restart all services
+          ```
+
+          ## 📖 Documentation
+
+          - **Setup Guide**: docs/setup.md
+          - **Security Guide**: docs/security.md
+          - **Troubleshooting**: docs/troubleshooting.md
+          - **Architecture**: README.md
+
+          ## 🔒 Security
+
+          This release includes comprehensive security hardening:
+          - All containers run with security constraints
+          - Firewall configured with minimal required ports
+          - SSH access secured with custom port and key authentication
+          - Automated security monitoring and alerting
+          - Regular security updates
+
+          ## 🇦🇺 Australian Network Optimization
+
+          Specifically optimized for Australian home networks:
+          - Primary DNS: Cloudflare Sydney (1.1.1.1)
+          - Secondary DNS: Quad9 Australia-friendly (9.9.9.9)
+          - Tertiary DNS: Google Sydney (8.8.8.8)
+          - Timezone: Australia/Sydney
+          - Network: 192.168.1.0/24 (configurable)
+
+          ## 📞 Support
+
+          - **Documentation**: Complete setup and troubleshooting guides included
+          - **Issues**: Report bugs and feature requests on GitHub
+          - **Security**: See SECURITY.md for security policy
+
+          ## ⚠️ Important Notes
+
+          - **First-time setup**: Allow 10-15 minutes for complete installation
+          - **Firewall**: Ensure ports 53, 2222, and 3000 are accessible
+          - **Backup**: Automated daily backups to /opt/backups
+          - **Updates**: Automatic container updates at 3 AM daily
+          - **Monitoring**: Check Grafana dashboards for system health
+
+          ---
+
+          **Checksums**: See `checksums.txt` for file integrity verification
+          **License**: MIT License
+          **Supported Platforms**: Ubuntu 22.04 LTS (primary), Debian 11+ (community)
+          EOF
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts-${{ env.VERSION }}
+          path: |
+            adguard-home-infrastructure-${{ env.VERSION }}.tar.gz
+            adguard-home-infrastructure-${{ env.VERSION }}.zip
+            release-notes.md
+          retention-days: 30
+
+  # Create GitHub release
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    needs: [validate, test, build-artifacts]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set release version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts-${{ env.VERSION }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: AdGuard Home Infrastructure ${{ env.VERSION }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          files: |
+            adguard-home-infrastructure-${{ env.VERSION }}.tar.gz
+            adguard-home-infrastructure-${{ env.VERSION }}.zip
+          generate_release_notes: true
+
+  # Update documentation
+  update-docs:
+    name: Update Documentation
+    runs-on: ubuntu-22.04
+    needs: release
+    if: success()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update version in documentation
+        run: |
+          VERSION=${{ env.VERSION }}
+
+          # Update README.md with latest version
+          if grep -q "Current Version:" README.md; then
+            sed -i "s/Current Version: .*/Current Version: $VERSION/" README.md
+          else
+            echo "Current Version: $VERSION" >> README.md
+          fi
+
+          # Update installation instructions with latest download URL
+          if grep -q "wget.*releases.*download" README.md; then
+            sed -i "s|wget.*releases.*download.*tar.gz|wget https://github.com/${{ github.repository }}/releases/download/$VERSION/adguard-home-infrastructure-$VERSION.tar.gz|g" README.md
+          fi
+
+      - name: Commit documentation updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          if git diff --quiet; then
+            echo "No documentation changes to commit"
+          else
+            git add README.md
+            git commit -m "docs: update version to ${{ env.VERSION }} [skip ci]"
+            git push
+          fi
+
+  # Post-release notifications
+  notify:
+    name: Post-Release Notifications
+    runs-on: ubuntu-22.04
+    needs: [release, update-docs]
+    if: success()
+
+    steps:
+      - name: Send release notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          VERSION=${{ env.VERSION }}
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/$VERSION"
+
+          MESSAGE="🎉 AdGuard Home Infrastructure $VERSION has been released!
+
+          ✨ Australian-optimized DNS filtering with complete monitoring stack
+          🔒 Production-ready security hardening included
+          📊 Comprehensive monitoring and alerting
+          🚀 One-command installation
+
+          Download: $RELEASE_URL
+
+          Perfect for Australian home networks with Sydney PoP optimization!"
+
+          # Send to Slack
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"$MESSAGE\"}" \
+              "$SLACK_WEBHOOK_URL"
+          fi
+
+          # Send to Discord
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"content\":\"$MESSAGE\"}" \
+              "$DISCORD_WEBHOOK_URL"
+          fi
+
+      - name: Create release announcement issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = process.env.VERSION || '${{ env.VERSION }}';
+            const releaseUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/releases/tag/${version}`;
+
+            const body = `
+            # 🎉 AdGuard Home Infrastructure ${version} Released!
+
+            We're excited to announce the release of AdGuard Home Infrastructure ${version}!
+
+            ## What's New
+            - Complete Infrastructure as Code solution for AdGuard Home
+            - Australian DNS optimization with Sydney PoP servers
+            - Comprehensive monitoring with Prometheus and Grafana
+            - Production-ready security hardening
+            - One-command installation process
+
+            ## Quick Start
+            \`\`\`bash
+            wget ${releaseUrl.replace('/tag/', '/download/')}/adguard-home-infrastructure-${version}.tar.gz
+            tar -xzf adguard-home-infrastructure-${version}.tar.gz
+            cd adguard-home-infrastructure-${version}
+            sudo make install
+            \`\`\`
+
+            ## Resources
+            - [📥 Download Release](${releaseUrl})
+            - [📖 Documentation](./docs/)
+            - [🔧 Setup Guide](./docs/setup.md)
+            - [🔒 Security Guide](./docs/security.md)
+
+            Perfect for Australian home networks! 🇦🇺
+
+            ---
+            This issue was created automatically. Feel free to ask questions or provide feedback!
+            `;
+
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🎉 Release ${version} - AdGuard Home Infrastructure`,
+              body: body,
+              labels: ['release', 'announcement']
+            });
+
+  # Deployment to demo environment (optional)
+  deploy-demo:
+    name: Deploy to Demo Environment
+    runs-on: ubuntu-22.04
+    needs: release
+    if: success() && github.ref == 'refs/heads/main'
+    environment: demo
+
+    steps:
+      - name: Deploy to demo environment
+        run: |
+          echo "Demo deployment would happen here"
+          echo "This could deploy to a staging/demo server for testing"
+          echo "Version: ${{ env.VERSION }}"
+          echo "Demo URL would be: https://demo.adguard-infrastructure.example.com"

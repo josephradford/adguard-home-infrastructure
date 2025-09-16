@@ -1,0 +1,716 @@
+name: Deploy to Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version to deploy (tag or branch)'
+        required: true
+        default: 'main'
+        type: string
+      skip_backup:
+        description: 'Skip pre-deployment backup'
+        required: false
+        default: false
+        type: boolean
+      force_deploy:
+        description: 'Force deployment (skip health checks)'
+        required: false
+        default: false
+        type: boolean
+
+  push:
+    branches:
+      - main
+    paths:
+      - 'docker/**'
+      - 'configs/**'
+      - 'scripts/**'
+
+env:
+  DEPLOYMENT_TIMEOUT: 1800  # 30 minutes
+  HEALTH_CHECK_RETRIES: 30
+  BACKUP_RETENTION_DAYS: 7
+
+jobs:
+  # Pre-deployment validation
+  pre-deploy:
+    name: Pre-Deployment Validation
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    outputs:
+      target_host: ${{ steps.config.outputs.target_host }}
+      ssh_port: ${{ steps.config.outputs.ssh_port }}
+      ssh_user: ${{ steps.config.outputs.ssh_user }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version || 'main' }}
+
+      - name: Set deployment configuration
+        id: config
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment || 'staging' }}"
+
+          case $ENVIRONMENT in
+            staging)
+              echo "target_host=192.168.1.101" >> $GITHUB_OUTPUT
+              echo "ssh_port=2222" >> $GITHUB_OUTPUT
+              echo "ssh_user=adguard" >> $GITHUB_OUTPUT
+              ;;
+            production)
+              echo "target_host=192.168.1.100" >> $GITHUB_OUTPUT
+              echo "ssh_port=2222" >> $GITHUB_OUTPUT
+              echo "ssh_user=adguard" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "ERROR: Unknown environment: $ENVIRONMENT"
+              exit 1
+              ;;
+          esac
+
+          echo "Environment: $ENVIRONMENT"
+          echo "Version: ${{ github.event.inputs.version || github.sha }}"
+
+      - name: Validate deployment inputs
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "production" ] && [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            if [ "${{ github.event.inputs.force_deploy }}" != "true" ]; then
+              echo "ERROR: Production deployments require main branch or force_deploy=true"
+              exit 1
+            fi
+          fi
+
+          echo "Deployment validation passed"
+
+      - name: Check SSH connectivity
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          if [ -z "$SSH_PRIVATE_KEY" ]; then
+            echo "ERROR: SSH_PRIVATE_KEY secret not configured"
+            exit 1
+          fi
+
+          # Setup SSH key
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # Test connectivity
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=10 \
+              -p ${{ steps.config.outputs.ssh_port }} \
+              ${{ steps.config.outputs.ssh_user }}@${{ steps.config.outputs.target_host }} \
+              "echo 'SSH connectivity test successful'"
+
+  # Create pre-deployment backup
+  backup:
+    name: Pre-Deployment Backup
+    runs-on: ubuntu-22.04
+    needs: pre-deploy
+    if: github.event.inputs.skip_backup != 'true'
+    timeout-minutes: 20
+
+    steps:
+      - name: Create backup
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          # Create pre-deployment backup
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p $SSH_PORT \
+              $SSH_USER@$TARGET_HOST \
+              "cd /opt/adguard-infrastructure && ./scripts/backup/backup.sh"
+
+          echo "Pre-deployment backup completed"
+
+      - name: Verify backup
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          # Verify latest backup exists
+          LATEST_BACKUP=$(ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p $SSH_PORT \
+              $SSH_USER@$TARGET_HOST \
+              "ls -t /opt/backups/adguard-backup-*.tar.gz* 2>/dev/null | head -1" || echo "")
+
+          if [ -z "$LATEST_BACKUP" ]; then
+            echo "ERROR: No backup found after backup creation"
+            exit 1
+          fi
+
+          echo "Backup verified: $LATEST_BACKUP"
+
+  # Deploy infrastructure
+  deploy:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-22.04
+    needs: [pre-deploy, backup]
+    if: always() && (needs.backup.result == 'success' || needs.backup.result == 'skipped')
+    timeout-minutes: 30
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version || 'main' }}
+
+      - name: Prepare deployment package
+        run: |
+          # Create deployment package
+          tar -czf deployment-package.tar.gz \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='*.log' \
+            --exclude='data/' \
+            --exclude='volumes/' \
+            .
+
+          echo "Deployment package created"
+
+      - name: Transfer deployment package
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          # Transfer package
+          scp -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -P $SSH_PORT \
+              deployment-package.tar.gz \
+              $SSH_USER@$TARGET_HOST:/tmp/
+
+          echo "Deployment package transferred"
+
+      - name: Extract and prepare deployment
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          # Extract deployment package
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p $SSH_PORT \
+              $SSH_USER@$TARGET_HOST << 'EOF'
+            # Create deployment directory
+            sudo mkdir -p /opt/adguard-infrastructure-new
+            sudo chown $USER:$USER /opt/adguard-infrastructure-new
+
+            # Extract package
+            cd /opt/adguard-infrastructure-new
+            tar -xzf /tmp/deployment-package.tar.gz
+
+            # Preserve existing environment configuration
+            if [ -f /opt/adguard-infrastructure/.env ]; then
+              cp /opt/adguard-infrastructure/.env .env
+            fi
+
+            # Set permissions
+            chmod +x scripts/**/*.sh
+            chmod +x configs/firewall/ufw-rules.sh
+
+            echo "Deployment package prepared"
+          EOF
+
+      - name: Stop current services
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          # Gracefully stop services
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p $SSH_PORT \
+              $SSH_USER@$TARGET_HOST << 'EOF'
+            if [ -d "/opt/adguard-infrastructure" ]; then
+              echo "Stopping current services..."
+              cd /opt/adguard-infrastructure/docker
+              docker-compose down --timeout 30 || true
+              echo "Services stopped"
+            else
+              echo "No existing installation found"
+            fi
+          EOF
+
+      - name: Deploy new version
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          # Deploy new version
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p $SSH_PORT \
+              $SSH_USER@$TARGET_HOST << 'EOF'
+            # Backup current installation if it exists
+            if [ -d "/opt/adguard-infrastructure" ]; then
+              sudo mv /opt/adguard-infrastructure /opt/adguard-infrastructure-backup-$(date +%Y%m%d-%H%M%S)
+            fi
+
+            # Move new installation to production location
+            sudo mv /opt/adguard-infrastructure-new /opt/adguard-infrastructure
+            sudo chown -R $USER:$USER /opt/adguard-infrastructure
+
+            echo "New version deployed"
+          EOF
+
+      - name: Update configuration
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          # Update configurations
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p $SSH_PORT \
+              $SSH_USER@$TARGET_HOST << 'EOF'
+            cd /opt/adguard-infrastructure
+
+            # Update system configurations
+            if [ -f "configs/firewall/ufw-rules.sh" ]; then
+              sudo ./configs/firewall/ufw-rules.sh
+            fi
+
+            # Update systemd service if needed
+            if [ -f "configs/systemd/adguard.service" ]; then
+              sudo cp configs/systemd/adguard.service /etc/systemd/system/
+              sudo systemctl daemon-reload
+            fi
+
+            echo "Configuration updated"
+          EOF
+
+      - name: Start services
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          # Start services
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p $SSH_PORT \
+              $SSH_USER@$TARGET_HOST << 'EOF'
+            cd /opt/adguard-infrastructure/docker
+
+            # Pull latest images
+            docker-compose pull
+
+            # Start services
+            docker-compose up -d
+
+            echo "Services started"
+          EOF
+
+  # Post-deployment health checks
+  health-check:
+    name: Post-Deployment Health Check
+    runs-on: ubuntu-22.04
+    needs: [pre-deploy, deploy]
+    timeout-minutes: 15
+
+    steps:
+      - name: Wait for services to stabilize
+        run: |
+          echo "Waiting for services to stabilize..."
+          sleep 60
+
+      - name: Check service health
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          # Health check script
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p $SSH_PORT \
+              $SSH_USER@$TARGET_HOST << 'EOF'
+            echo "Performing health checks..."
+
+            # Check container status
+            cd /opt/adguard-infrastructure/docker
+            if ! docker-compose ps | grep -q "Up"; then
+              echo "ERROR: Some containers are not running"
+              docker-compose ps
+              exit 1
+            fi
+
+            # Check AdGuard Home
+            for i in {1..30}; do
+              if curl -f -s http://localhost:3000/ >/dev/null; then
+                echo "✓ AdGuard Home is healthy"
+                break
+              fi
+              if [ $i -eq 30 ]; then
+                echo "ERROR: AdGuard Home health check failed"
+                exit 1
+              fi
+              sleep 10
+            done
+
+            # Check DNS resolution
+            if ! dig @localhost google.com >/dev/null 2>&1; then
+              echo "ERROR: DNS resolution not working"
+              exit 1
+            fi
+            echo "✓ DNS resolution is working"
+
+            # Check Prometheus
+            if curl -f -s http://localhost:9090/-/healthy >/dev/null; then
+              echo "✓ Prometheus is healthy"
+            else
+              echo "WARNING: Prometheus health check failed"
+            fi
+
+            # Check Grafana
+            if curl -f -s http://localhost:3001/api/health >/dev/null; then
+              echo "✓ Grafana is healthy"
+            else
+              echo "WARNING: Grafana health check failed"
+            fi
+
+            echo "Health checks completed successfully"
+          EOF
+
+      - name: Test DNS blocking
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          # Test DNS blocking functionality
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p $SSH_PORT \
+              $SSH_USER@$TARGET_HOST << 'EOF'
+            echo "Testing DNS blocking functionality..."
+
+            # Test known ad domain
+            result=$(dig @localhost doubleclick.net +short | head -1 || echo "")
+            if [ "$result" = "0.0.0.0" ] || [ -z "$result" ]; then
+              echo "✓ DNS blocking is working"
+            else
+              echo "WARNING: DNS blocking test inconclusive"
+            fi
+
+            echo "DNS blocking test completed"
+          EOF
+
+      - name: Verify monitoring data
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          # Check monitoring data
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p $SSH_PORT \
+              $SSH_USER@$TARGET_HOST << 'EOF'
+            echo "Verifying monitoring data..."
+
+            # Check Prometheus targets
+            if curl -s "http://localhost:9090/api/v1/targets" | grep -q '"health":"up"'; then
+              echo "✓ Prometheus targets are healthy"
+            else
+              echo "WARNING: Some Prometheus targets may be down"
+            fi
+
+            # Check AdGuard metrics
+            if curl -s "http://localhost:9617/metrics" | grep -q "adguard_"; then
+              echo "✓ AdGuard metrics are available"
+            else
+              echo "WARNING: AdGuard metrics may not be available"
+            fi
+
+            echo "Monitoring verification completed"
+          EOF
+
+  # Rollback on failure
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-22.04
+    needs: [pre-deploy, deploy, health-check]
+    if: failure() && needs.deploy.result == 'success'
+    timeout-minutes: 15
+
+    steps:
+      - name: Perform rollback
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          echo "Performing rollback due to deployment failure..."
+
+          # Rollback to previous version
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p $SSH_PORT \
+              $SSH_USER@$TARGET_HOST << 'EOF'
+            # Stop current services
+            cd /opt/adguard-infrastructure/docker
+            docker-compose down --timeout 30 || true
+
+            # Find most recent backup
+            BACKUP_DIR=$(ls -td /opt/adguard-infrastructure-backup-* 2>/dev/null | head -1)
+
+            if [ -n "$BACKUP_DIR" ] && [ -d "$BACKUP_DIR" ]; then
+              echo "Rolling back to: $BACKUP_DIR"
+
+              # Remove failed deployment
+              sudo rm -rf /opt/adguard-infrastructure
+
+              # Restore from backup
+              sudo mv "$BACKUP_DIR" /opt/adguard-infrastructure
+              sudo chown -R $USER:$USER /opt/adguard-infrastructure
+
+              # Start services
+              cd /opt/adguard-infrastructure/docker
+              docker-compose up -d
+
+              echo "Rollback completed"
+            else
+              echo "ERROR: No backup found for rollback"
+              exit 1
+            fi
+          EOF
+
+      - name: Verify rollback
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          # Wait for services to start
+          sleep 60
+
+          # Verify rollback success
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p $SSH_PORT \
+              $SSH_USER@$TARGET_HOST << 'EOF'
+            # Check if AdGuard is accessible
+            if curl -f -s http://localhost:3000/ >/dev/null; then
+              echo "✓ Rollback successful - AdGuard Home is accessible"
+            else
+              echo "ERROR: Rollback failed - AdGuard Home not accessible"
+              exit 1
+            fi
+          EOF
+
+  # Cleanup old backups
+  cleanup:
+    name: Cleanup Old Resources
+    runs-on: ubuntu-22.04
+    needs: [pre-deploy, health-check]
+    if: success()
+    timeout-minutes: 10
+
+    steps:
+      - name: Cleanup old backups and deployments
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          TARGET_HOST="${{ needs.pre-deploy.outputs.target_host }}"
+          SSH_PORT="${{ needs.pre-deploy.outputs.ssh_port }}"
+          SSH_USER="${{ needs.pre-deploy.outputs.ssh_user }}"
+
+          # Cleanup old resources
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p $SSH_PORT \
+              $SSH_USER@$TARGET_HOST << EOF
+            echo "Cleaning up old resources..."
+
+            # Remove deployment packages
+            rm -f /tmp/deployment-package.tar.gz
+
+            # Keep only last 3 deployment backups
+            ls -td /opt/adguard-infrastructure-backup-* 2>/dev/null | tail -n +4 | xargs sudo rm -rf
+
+            # Clean up old Docker images
+            docker image prune -f
+
+            # Clean up old backups (keep last $BACKUP_RETENTION_DAYS days)
+            find /opt/backups -name "adguard-backup-*.tar.gz*" -mtime +$BACKUP_RETENTION_DAYS -delete 2>/dev/null || true
+
+            echo "Cleanup completed"
+          EOF
+
+  # Post-deployment notifications
+  notify:
+    name: Deployment Notification
+    runs-on: ubuntu-22.04
+    needs: [pre-deploy, deploy, health-check, cleanup]
+    if: always()
+
+    steps:
+      - name: Send deployment notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment || 'staging' }}"
+          VERSION="${{ github.event.inputs.version || github.sha }}"
+          STATUS="success"
+
+          # Determine overall status
+          if [ "${{ needs.deploy.result }}" != "success" ] || [ "${{ needs.health-check.result }}" != "success" ]; then
+            STATUS="failed"
+          fi
+
+          # Create notification message
+          if [ "$STATUS" = "success" ]; then
+            MESSAGE="✅ AdGuard Infrastructure deployment to $ENVIRONMENT completed successfully!
+
+            📦 Version: $VERSION
+            🎯 Environment: $ENVIRONMENT
+            🏠 Target: ${{ needs.pre-deploy.outputs.target_host }}
+            ⏱️ Deployed: $(date -u)
+
+            Services are healthy and ready! 🚀"
+          else
+            MESSAGE="❌ AdGuard Infrastructure deployment to $ENVIRONMENT FAILED!
+
+            📦 Version: $VERSION
+            🎯 Environment: $ENVIRONMENT
+            ❌ Status: $STATUS
+
+            Please check GitHub Actions logs for details."
+
+            if [ "${{ needs.rollback.result }}" = "success" ]; then
+              MESSAGE="$MESSAGE
+
+              🔄 Automatic rollback completed successfully."
+            fi
+          fi
+
+          # Send to Slack
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"$MESSAGE\"}" \
+              "$SLACK_WEBHOOK_URL"
+          fi
+
+          echo "Notification sent"

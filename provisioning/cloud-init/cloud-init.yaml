@@ -1,0 +1,353 @@
+#cloud-config
+# AdGuard Home Infrastructure - Ubuntu Server 22.04 LTS Cloud-Init Configuration
+# Optimized for Australian deployment with comprehensive security hardening
+
+hostname: adguard-dns
+fqdn: adguard-dns.home.local
+timezone: Australia/Sydney
+
+# User configuration
+users:
+  - name: adguard
+    groups: sudo, docker
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ssh-rsa YOUR_PUBLIC_KEY_HERE # Replace with your actual public key
+    lock_passwd: true
+
+# Disable root login
+disable_root: true
+
+# System packages
+package_update: true
+package_upgrade: true
+packages:
+  - curl
+  - wget
+  - git
+  - htop
+  - vim
+  - unzip
+  - ufw
+  - fail2ban
+  - docker.io
+  - docker-compose
+  - certbot
+  - python3-certbot-dns-cloudflare
+  - rsync
+  - logrotate
+  - cron
+  - ntp
+  - unattended-upgrades
+  - apt-listchanges
+  - needrestart
+  - rkhunter
+  - chkrootkit
+  - aide
+  - lynis
+  - tree
+  - jq
+  - yq
+
+# Network configuration
+network:
+  version: 2
+  ethernets:
+    eth0:
+      dhcp4: false
+      addresses:
+        - 192.168.1.100/24
+      gateway4: 192.168.1.1
+      nameservers:
+        addresses:
+          - 1.1.1.1
+          - 9.9.9.9
+        search:
+          - home.local
+
+# SSH hardening
+ssh_pwauth: false
+ssh_port: 2222
+
+# Write configuration files
+write_files:
+  # SSH daemon configuration
+  - path: /etc/ssh/sshd_config
+    content: |
+      Port 2222
+      Protocol 2
+      HostKey /etc/ssh/ssh_host_rsa_key
+      HostKey /etc/ssh/ssh_host_dsa_key
+      HostKey /etc/ssh/ssh_host_ecdsa_key
+      HostKey /etc/ssh/ssh_host_ed25519_key
+      UsePrivilegeSeparation yes
+      KeyRegenerationInterval 3600
+      ServerKeyBits 1024
+      SyslogFacility AUTH
+      LogLevel INFO
+      LoginGraceTime 120
+      PermitRootLogin no
+      StrictModes yes
+      RSAAuthentication yes
+      PubkeyAuthentication yes
+      IgnoreRhosts yes
+      RhostsRSAAuthentication no
+      HostbasedAuthentication no
+      PermitEmptyPasswords no
+      ChallengeResponseAuthentication no
+      PasswordAuthentication no
+      X11Forwarding no
+      X11DisplayOffset 10
+      PrintMotd no
+      PrintLastLog yes
+      TCPKeepAlive yes
+      AcceptEnv LANG LC_*
+      Subsystem sftp /usr/lib/openssh/sftp-server
+      UsePAM yes
+      AllowUsers adguard
+      ClientAliveInterval 600
+      ClientAliveCountMax 3
+      MaxAuthTries 3
+      MaxSessions 2
+    permissions: '0644'
+
+  # UFW firewall rules
+  - path: /etc/ufw/applications.d/adguard
+    content: |
+      [AdGuard Home]
+      title=AdGuard Home DNS Server
+      description=AdGuard Home DNS filtering service
+      ports=53,3000/tcp
+
+      [AdGuard DNS]
+      title=AdGuard DNS
+      description=DNS service
+      ports=53/tcp|53/udp
+
+      [AdGuard Web]
+      title=AdGuard Web Interface
+      description=AdGuard web management interface
+      ports=3000/tcp
+    permissions: '0644'
+
+  # Fail2ban jail configuration for AdGuard
+  - path: /etc/fail2ban/jail.d/adguard.conf
+    content: |
+      [adguard-auth]
+      enabled = true
+      port = 3000
+      filter = adguard-auth
+      logpath = /opt/adguard/data/querylog.json
+      maxretry = 5
+      bantime = 3600
+      findtime = 600
+
+      [ssh-custom]
+      enabled = true
+      port = 2222
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 3
+      bantime = 3600
+      findtime = 600
+    permissions: '0644'
+
+  # Fail2ban filter for AdGuard
+  - path: /etc/fail2ban/filter.d/adguard-auth.conf
+    content: |
+      [Definition]
+      failregex = ^.*"IP":"<HOST>".*"QT":".*"
+      ignoreregex =
+    permissions: '0644'
+
+  # Automatic security updates configuration
+  - path: /etc/apt/apt.conf.d/50unattended-upgrades
+    content: |
+      Unattended-Upgrade::Allowed-Origins {
+          "${distro_id}:${distro_codename}";
+          "${distro_id}:${distro_codename}-security";
+          "${distro_id}:${distro_codename}-updates";
+      };
+      Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+      Unattended-Upgrade::MinimalSteps "true";
+      Unattended-Upgrade::Remove-Unused-Dependencies "true";
+      Unattended-Upgrade::Automatic-Reboot "false";
+      Unattended-Upgrade::Automatic-Reboot-Time "02:00";
+    permissions: '0644'
+
+  # Docker daemon configuration
+  - path: /etc/docker/daemon.json
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        },
+        "storage-driver": "overlay2",
+        "live-restore": true,
+        "userland-proxy": false,
+        "no-new-privileges": true
+      }
+    permissions: '0644'
+
+  # System limits for better performance
+  - path: /etc/security/limits.d/adguard.conf
+    content: |
+      * soft nofile 65536
+      * hard nofile 65536
+      * soft nproc 32768
+      * hard nproc 32768
+    permissions: '0644'
+
+  # Sysctl optimizations for DNS performance
+  - path: /etc/sysctl.d/99-adguard.conf
+    content: |
+      # Network performance optimizations for DNS
+      net.core.rmem_default = 262144
+      net.core.rmem_max = 16777216
+      net.core.wmem_default = 262144
+      net.core.wmem_max = 16777216
+      net.core.netdev_max_backlog = 5000
+      net.ipv4.tcp_rmem = 4096 87380 16777216
+      net.ipv4.tcp_wmem = 4096 65536 16777216
+      net.ipv4.tcp_congestion_control = bbr
+      net.ipv4.tcp_slow_start_after_idle = 0
+      net.ipv4.tcp_tw_reuse = 1
+      net.ipv4.ip_local_port_range = 1024 65535
+
+      # Security hardening
+      net.ipv4.conf.all.rp_filter = 1
+      net.ipv4.conf.default.rp_filter = 1
+      net.ipv4.conf.all.accept_redirects = 0
+      net.ipv4.conf.default.accept_redirects = 0
+      net.ipv4.conf.all.send_redirects = 0
+      net.ipv4.conf.default.send_redirects = 0
+      net.ipv4.conf.all.accept_source_route = 0
+      net.ipv4.conf.default.accept_source_route = 0
+      net.ipv4.conf.all.log_martians = 1
+      net.ipv4.conf.default.log_martians = 1
+      net.ipv4.icmp_echo_ignore_broadcasts = 1
+      net.ipv4.icmp_ignore_bogus_error_responses = 1
+      net.ipv6.conf.all.accept_redirects = 0
+      net.ipv6.conf.default.accept_redirects = 0
+      kernel.dmesg_restrict = 1
+      kernel.kptr_restrict = 2
+    permissions: '0644'
+
+  # Logrotate configuration for AdGuard
+  - path: /etc/logrotate.d/adguard
+    content: |
+      /opt/adguard/logs/*.log {
+          daily
+          missingok
+          rotate 7
+          compress
+          delaycompress
+          notifempty
+          copytruncate
+          su adguard adguard
+      }
+    permissions: '0644'
+
+# Commands to run during cloud-init
+runcmd:
+  # Create directories
+  - mkdir -p /opt/adguard/{data,logs,work,conf}
+  - mkdir -p /opt/monitoring/{prometheus,grafana,alertmanager}
+  - mkdir -p /opt/backups
+  - mkdir -p /opt/scripts
+
+  # Set ownership
+  - chown -R adguard:adguard /opt/adguard
+  - chown -R adguard:adguard /opt/monitoring
+  - chown -R adguard:adguard /opt/backups
+  - chown -R adguard:adguard /opt/scripts
+
+  # Enable and start Docker
+  - systemctl enable docker
+  - systemctl start docker
+  - usermod -aG docker adguard
+
+  # Configure firewall
+  - ufw --force reset
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 2222/tcp comment 'SSH'
+  - ufw allow 53/tcp comment 'DNS TCP'
+  - ufw allow 53/udp comment 'DNS UDP'
+  - ufw allow 3000/tcp comment 'AdGuard Web'
+  - ufw allow from 192.168.1.0/24 to any port 9090 comment 'Prometheus'
+  - ufw allow from 192.168.1.0/24 to any port 3001 comment 'Grafana'
+  - ufw --force enable
+
+  # Configure fail2ban
+  - systemctl enable fail2ban
+  - systemctl start fail2ban
+
+  # Enable automatic updates
+  - systemctl enable unattended-upgrades
+  - dpkg-reconfigure -plow unattended-upgrades
+
+  # Set up NTP
+  - systemctl enable ntp
+  - systemctl start ntp
+
+  # Apply sysctl settings
+  - sysctl -p /etc/sysctl.d/99-adguard.conf
+
+  # Download and install latest docker-compose
+  - curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  - chmod +x /usr/local/bin/docker-compose
+
+  # Security hardening
+  - chmod 700 /home/adguard
+  - chmod 600 /home/adguard/.ssh/authorized_keys
+
+  # Initialize AIDE database
+  - aideinit
+  - mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+
+  # Set up log monitoring
+  - echo "0 2 * * * root /usr/bin/aide --check" >> /etc/crontab
+  - echo "0 3 * * * adguard /opt/scripts/backup/backup.sh" >> /etc/crontab
+  - echo "*/15 * * * * adguard /opt/scripts/monitoring/comprehensive-monitor.sh" >> /etc/crontab
+
+  # Restart SSH with new configuration
+  - systemctl restart ssh
+
+  # Create welcome message
+  - echo "AdGuard Home infrastructure server ready!" > /etc/motd
+  - echo "Deployment completed at: $(date)" >> /etc/motd
+  - echo "Static IP: 192.168.1.100" >> /etc/motd
+  - echo "SSH Port: 2222" >> /etc/motd
+  - echo "Web Interface: http://192.168.1.100:3000" >> /etc/motd
+
+# Final message
+final_message: |
+  AdGuard Home infrastructure server has been successfully provisioned!
+
+  Configuration Summary:
+  - Static IP: 192.168.1.100/24
+  - SSH Port: 2222 (key-only authentication)
+  - User: adguard (sudo access)
+  - Timezone: Australia/Sydney
+  - Docker and docker-compose installed
+  - UFW firewall configured and enabled
+  - Fail2ban protection active
+  - Automatic security updates enabled
+  - System optimized for DNS performance
+
+  Next steps:
+  1. SSH to the server: ssh -p 2222 adguard@192.168.1.100
+  2. Clone the infrastructure repository
+  3. Run: make install
+
+  The system will reboot in 1 minute to apply all configurations.
+
+# Reboot after configuration
+power_state:
+  delay: 60
+  mode: reboot
+  message: "Rebooting to apply all configurations"

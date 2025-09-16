@@ -1,0 +1,517 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run security scan daily at 3 AM UTC (2 PM AEDT)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of security scan'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - quick
+          - containers-only
+
+env:
+  COMPOSE_PROJECT_NAME: adguard-security-scan
+
+permissions:
+  security-events: write
+  contents: read
+  actions: read
+
+jobs:
+  # Container vulnerability scanning
+  container-scan:
+    name: Container Vulnerability Scan
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    strategy:
+      matrix:
+        image:
+          - adguard/adguardhome:latest
+          - prom/prometheus:latest
+          - grafana/grafana-oss:latest
+          - prom/node-exporter:latest
+          - prom/alertmanager:latest
+          - ebrianne/adguard-exporter:latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ matrix.image }}
+          format: 'sarif'
+          output: 'trivy-${{ matrix.image }}-results.sarif'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-${{ matrix.image }}-results.sarif'
+          category: 'container-${{ matrix.image }}'
+
+      - name: Check for critical vulnerabilities
+        run: |
+          # Extract critical vulnerabilities count
+          critical_count=$(grep -o '"level": "error"' "trivy-${{ matrix.image }}-results.sarif" | wc -l || echo "0")
+          high_count=$(grep -o '"level": "warning"' "trivy-${{ matrix.image }}-results.sarif" | wc -l || echo "0")
+
+          echo "Critical vulnerabilities: $critical_count"
+          echo "High vulnerabilities: $high_count"
+
+          # Create summary
+          echo "## Security Scan Results for ${{ matrix.image }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Critical: $critical_count" >> $GITHUB_STEP_SUMMARY
+          echo "- High: $high_count" >> $GITHUB_STEP_SUMMARY
+
+          # Fail if critical vulnerabilities found
+          if [ "$critical_count" -gt 0 ]; then
+            echo "::error::Critical vulnerabilities found in ${{ matrix.image }}"
+            exit 1
+          fi
+
+  # Infrastructure security scanning
+  infrastructure-scan:
+    name: Infrastructure Security Scan
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install security tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git \
+            curl \
+            jq \
+            yamllint
+
+          # Install additional security scanners
+          pip install \
+            bandit \
+            safety \
+            semgrep
+
+      - name: Scan for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+      - name: Run Semgrep security analysis
+        run: |
+          semgrep --config=auto \
+            --json \
+            --output=semgrep-results.json \
+            --exclude="*.log" \
+            --exclude="*.tmp" \
+            .
+
+          # Check for high severity issues
+          high_severity=$(jq '.results[] | select(.extra.severity == "ERROR")' semgrep-results.json | jq -s length)
+          echo "High severity issues found: $high_severity"
+
+          if [ "$high_severity" -gt 0 ]; then
+            echo "::warning::High severity security issues found"
+            jq '.results[] | select(.extra.severity == "ERROR") | .message' semgrep-results.json
+          fi
+
+      - name: Check Docker security best practices
+        run: |
+          echo "Checking Docker security configuration..."
+
+          # Check for security anti-patterns in Docker Compose
+          issues=0
+
+          # Check for privileged containers
+          if grep -r "privileged.*true" docker/ >/dev/null 2>&1; then
+            echo "::error::Privileged containers found"
+            ((issues++))
+          fi
+
+          # Check for host network mode
+          if grep -r "network_mode.*host" docker/ >/dev/null 2>&1; then
+            echo "::error::Host network mode found"
+            ((issues++))
+          fi
+
+          # Check for containers running as root
+          if ! grep -r "user:" docker/docker-compose.yml >/dev/null 2>&1; then
+            echo "::warning::Some containers may be running as root"
+          fi
+
+          # Check for read-only filesystems
+          if ! grep -r "read_only.*true" docker/docker-compose.yml >/dev/null 2>&1; then
+            echo "::warning::Consider using read-only filesystems"
+          fi
+
+          echo "Docker security check completed with $issues critical issues"
+
+      - name: Validate SSL/TLS configuration
+        run: |
+          echo "Checking SSL/TLS configuration..."
+
+          # Check for TLS configuration in configs
+          if grep -r "tls\|ssl" docker/configs/ >/dev/null 2>&1; then
+            echo "TLS configuration found"
+
+            # Check for weak cipher suites
+            if grep -r -i "rc4\|md5\|sha1" docker/configs/ >/dev/null 2>&1; then
+              echo "::warning::Weak cryptographic algorithms detected"
+            fi
+          else
+            echo "::warning::No TLS configuration found - consider enabling HTTPS"
+          fi
+
+      - name: Check firewall configuration security
+        run: |
+          echo "Analyzing firewall configuration..."
+
+          firewall_script="configs/firewall/ufw-rules.sh"
+          if [ -f "$firewall_script" ]; then
+            # Check for overly permissive rules
+            if grep -i "allow.*any" "$firewall_script" >/dev/null 2>&1; then
+              echo "::warning::Overly permissive firewall rules detected"
+            fi
+
+            # Check for proper port restrictions
+            if ! grep -i "192.168\|10.0\|172.16" "$firewall_script" >/dev/null 2>&1; then
+              echo "::warning::Management ports should be restricted to private networks"
+            fi
+
+            echo "Firewall configuration analysis completed"
+          else
+            echo "::error::Firewall configuration script not found"
+          fi
+
+  # Dependency vulnerability scanning
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies scanner
+        run: |
+          pip install safety
+
+      - name: Scan Python dependencies
+        run: |
+          # Create a requirements.txt file from installed packages in scripts
+          if find . -name "*.py" -type f | head -1 >/dev/null 2>&1; then
+            echo "Scanning Python dependencies..."
+            # Extract imports and check for known vulnerabilities
+            grep -r "import\|from.*import" . --include="*.py" | \
+              cut -d: -f2 | \
+              sed 's/^[[:space:]]*//' | \
+              grep -E "^(import|from)" | \
+              sort -u > /tmp/python_imports.txt || true
+
+            if [ -s /tmp/python_imports.txt ]; then
+              echo "Python imports found:"
+              cat /tmp/python_imports.txt
+            else
+              echo "No Python dependencies detected"
+            fi
+          else
+            echo "No Python files found"
+          fi
+
+      - name: Check for known vulnerable packages
+        run: |
+          echo "Checking for known vulnerable software versions..."
+
+          # Check Docker Compose version recommendations
+          if grep -r "version.*:" docker/docker-compose.yml; then
+            echo "Docker Compose version found"
+          fi
+
+          # Check for outdated base images
+          images=$(grep -r "image:" docker/docker-compose.yml | grep -v "latest" | cut -d: -f3- | sort -u)
+          if [ -n "$images" ]; then
+            echo "Specific image versions found:"
+            echo "$images"
+          else
+            echo "::warning::Using 'latest' tags may introduce security risks"
+          fi
+
+  # Network security analysis
+  network-security:
+    name: Network Security Analysis
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    if: github.event.inputs.scan_type != 'quick'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Analyze network configuration
+        run: |
+          echo "Analyzing network security configuration..."
+
+          # Check DNS configuration security
+          adguard_config="docker/configs/adguard/AdGuardHome.yaml"
+          if [ -f "$adguard_config" ]; then
+            # Check for secure DNS upstreams
+            if grep -q "https://" "$adguard_config"; then
+              echo "✓ DNS over HTTPS configured"
+            else
+              echo "::warning::Consider using DNS over HTTPS for upstream queries"
+            fi
+
+            # Check for query logging privacy
+            if grep -q "enabled.*true" "$adguard_config"; then
+              echo "✓ Query logging configured"
+              echo "::notice::Ensure query logs comply with local privacy regulations"
+            fi
+
+            # Check for rate limiting
+            if grep -q "ratelimit" "$adguard_config"; then
+              echo "✓ Rate limiting configured"
+            else
+              echo "::warning::Consider enabling rate limiting for DNS queries"
+            fi
+          fi
+
+          # Check monitoring security
+          prometheus_config="docker/configs/prometheus/prometheus.yml"
+          if [ -f "$prometheus_config" ]; then
+            # Check for authentication
+            if grep -q "basic_auth\|bearer_token" "$prometheus_config"; then
+              echo "✓ Authentication configured for monitoring"
+            else
+              echo "::warning::Consider adding authentication to monitoring endpoints"
+            fi
+          fi
+
+      - name: Check exposed ports and services
+        run: |
+          echo "Analyzing exposed ports and services..."
+
+          compose_file="docker/docker-compose.yml"
+          if [ -f "$compose_file" ]; then
+            # Extract exposed ports
+            exposed_ports=$(grep -E "^\s*-\s*[\"']?[0-9]+:" "$compose_file" | sed 's/.*- *[\"'\'']*//' | sed 's/[\"'\''].*//' | sort -u)
+
+            echo "Exposed ports:"
+            echo "$exposed_ports"
+
+            # Check for risky ports
+            risky_ports=("22" "23" "80" "443" "3389" "5432" "3306")
+            for port in $exposed_ports; do
+              port_num=$(echo "$port" | cut -d: -f1)
+              for risky in "${risky_ports[@]}"; do
+                if [ "$port_num" = "$risky" ]; then
+                  echo "::warning::Potentially risky port exposed: $port_num"
+                fi
+              done
+            done
+          fi
+
+  # Configuration security audit
+  config-audit:
+    name: Configuration Security Audit
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Audit system configurations
+        run: |
+          echo "Auditing system security configurations..."
+
+          # Check cloud-init security
+          cloud_init="provisioning/cloud-init/cloud-init.yaml"
+          if [ -f "$cloud_init" ]; then
+            echo "Checking cloud-init security..."
+
+            # Check SSH configuration
+            if grep -q "ssh_pwauth.*false" "$cloud_init"; then
+              echo "✓ Password authentication disabled"
+            else
+              echo "::warning::Consider disabling SSH password authentication"
+            fi
+
+            # Check for firewall configuration
+            if grep -q "ufw" "$cloud_init"; then
+              echo "✓ Firewall configuration found"
+            else
+              echo "::warning::No firewall configuration found in cloud-init"
+            fi
+
+            # Check for automatic updates
+            if grep -q "unattended-upgrades" "$cloud_init"; then
+              echo "✓ Automatic security updates configured"
+            else
+              echo "::warning::Consider enabling automatic security updates"
+            fi
+          fi
+
+          # Check fail2ban configuration
+          fail2ban_config="configs/fail2ban/jail.d/adguard.conf"
+          if [ -f "$fail2ban_config" ]; then
+            echo "✓ Fail2ban configuration found"
+
+            # Check ban times
+            ban_time=$(grep "bantime" "$fail2ban_config" | head -1 | cut -d= -f2 | tr -d ' ')
+            if [ "$ban_time" -ge 3600 ]; then
+              echo "✓ Appropriate ban time configured"
+            else
+              echo "::warning::Consider longer ban times for security"
+            fi
+          else
+            echo "::warning::No fail2ban configuration found"
+          fi
+
+      - name: Check backup security
+        run: |
+          echo "Checking backup security configuration..."
+
+          backup_script="scripts/backup/backup.sh"
+          if [ -f "$backup_script" ]; then
+            # Check for encryption
+            if grep -q "encryption\|encrypt" "$backup_script"; then
+              echo "✓ Backup encryption configured"
+            else
+              echo "::warning::Consider encrypting backups"
+            fi
+
+            # Check for secure backup locations
+            if grep -q "/opt/backups\|/var/backups" "$backup_script"; then
+              echo "✓ Local backup location configured"
+              echo "::notice::Consider off-site backup storage for disaster recovery"
+            fi
+          fi
+
+  # Security report generation
+  security-report:
+    name: Generate Security Report
+    runs-on: ubuntu-22.04
+    needs: [container-scan, infrastructure-scan, dependency-scan, network-security, config-audit]
+    if: always()
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate security summary
+        run: |
+          echo "# AdGuard Infrastructure Security Report" > security-report.md
+          echo "Generated: $(date -u)" >> security-report.md
+          echo "Commit: ${{ github.sha }}" >> security-report.md
+          echo "" >> security-report.md
+
+          # Add scan results summary
+          echo "## Scan Summary" >> security-report.md
+          echo "- Container Scan: ${{ needs.container-scan.result }}" >> security-report.md
+          echo "- Infrastructure Scan: ${{ needs.infrastructure-scan.result }}" >> security-report.md
+          echo "- Dependency Scan: ${{ needs.dependency-scan.result }}" >> security-report.md
+          echo "- Network Security: ${{ needs.network-security.result }}" >> security-report.md
+          echo "- Config Audit: ${{ needs.config-audit.result }}" >> security-report.md
+          echo "" >> security-report.md
+
+          # Add recommendations
+          echo "## Security Recommendations" >> security-report.md
+          echo "1. Regularly update Docker images to latest secure versions" >> security-report.md
+          echo "2. Monitor security advisories for used software components" >> security-report.md
+          echo "3. Implement proper TLS/SSL for all web interfaces" >> security-report.md
+          echo "4. Regularly review and test backup/recovery procedures" >> security-report.md
+          echo "5. Keep fail2ban and firewall rules updated" >> security-report.md
+          echo "6. Monitor logs for suspicious activities" >> security-report.md
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: security-report.md
+          retention-days: 30
+
+      - name: Comment security report on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('security-report.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## 🔐 Security Scan Results\n\n' + report
+            });
+
+  # Notify security team on critical findings
+  security-notification:
+    name: Security Notification
+    runs-on: ubuntu-22.04
+    needs: [container-scan, infrastructure-scan, dependency-scan, network-security, config-audit]
+    if: failure() && (github.ref == 'refs/heads/main' || github.event_name == 'schedule')
+
+    steps:
+      - name: Send security alert
+        env:
+          WEBHOOK_URL: ${{ secrets.SECURITY_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          message="🚨 SECURITY ALERT: Critical security issues found in AdGuard Infrastructure!\n\nFailed scans:\n"
+
+          if [ "${{ needs.container-scan.result }}" = "failure" ]; then
+            message="$message- Container vulnerabilities\n"
+          fi
+
+          if [ "${{ needs.infrastructure-scan.result }}" = "failure" ]; then
+            message="$message- Infrastructure security issues\n"
+          fi
+
+          message="$message\nCheck GitHub Actions for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # Send to security webhook if configured
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"$message\"}" \
+              "$WEBHOOK_URL"
+          fi
+
+          # Send to Slack if configured
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"$message\"}" \
+              "$SLACK_WEBHOOK_URL"
+          fi

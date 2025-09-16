@@ -1,0 +1,68 @@
+# AdGuard Home Infrastructure - Systemd Service Unit
+# Manages the complete AdGuard infrastructure stack
+
+[Unit]
+Description=AdGuard Home DNS Infrastructure
+Documentation=https://github.com/your-repo/adguard-home-infrastructure
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+User=adguard
+Group=adguard
+WorkingDirectory=/opt/adguard-infrastructure/docker
+
+# Environment
+Environment=COMPOSE_PROJECT_NAME=adguard-infrastructure
+EnvironmentFile=-/opt/adguard-infrastructure/.env
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/adguard /opt/monitoring /opt/logs /opt/backups
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+
+# Resource limits
+MemoryMax=2G
+CPUQuota=200%
+TasksMax=1000
+
+# Start command
+ExecStart=/usr/local/bin/docker-compose up -d
+
+# Stop command
+ExecStop=/usr/local/bin/docker-compose down --timeout 30
+
+# Reload command (for configuration updates)
+ExecReload=/usr/local/bin/docker-compose up -d --force-recreate
+
+# Health check
+ExecStartPost=/bin/bash -c 'for i in {1..30}; do if curl -f -s http://localhost:3000/ >/dev/null 2>&1; then exit 0; fi; sleep 2; done; exit 1'
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=adguard-infrastructure
+
+[Install]
+WantedBy=multi-user.target

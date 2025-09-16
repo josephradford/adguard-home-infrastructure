@@ -1,0 +1,483 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run CI daily at 2 AM UTC (1 PM AEDT)
+    - cron: '0 2 * * *'
+
+env:
+  COMPOSE_PROJECT_NAME: adguard-ci
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # Code quality and linting
+  lint:
+    name: Code Quality & Linting
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install linting tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck yamllint
+          pip install ansible-lint
+
+      - name: Lint shell scripts
+        run: |
+          echo "::group::Shell Script Linting"
+          find . -name "*.sh" -type f | xargs shellcheck
+          echo "::endgroup::"
+
+      - name: Lint YAML files
+        run: |
+          echo "::group::YAML Linting"
+          find . -name "*.yml" -o -name "*.yaml" | grep -v ".github" | xargs yamllint -d relaxed
+          echo "::endgroup::"
+
+      - name: Lint Docker Compose files
+        run: |
+          echo "::group::Docker Compose Validation"
+          cd docker && docker-compose config --quiet
+          echo "::endgroup::"
+
+      - name: Validate cloud-init configuration
+        run: |
+          echo "::group::Cloud-init Validation"
+          sudo apt-get install -y cloud-init
+          cloud-init schema --config-file provisioning/cloud-init/cloud-init.yaml
+          echo "::endgroup::"
+
+      - name: Check environment template
+        run: |
+          echo "::group::Environment Template Check"
+          if [ ! -f .env.example ]; then
+            echo "ERROR: .env.example file is missing"
+            exit 1
+          fi
+          # Check for required variables
+          required_vars=(
+            "STATIC_IP"
+            "ADGUARD_USERNAME"
+            "ADGUARD_PASSWORD"
+            "GRAFANA_ADMIN_USER"
+            "GRAFANA_ADMIN_PASSWORD"
+          )
+          for var in "${required_vars[@]}"; do
+            if ! grep -q "^${var}=" .env.example; then
+              echo "ERROR: Required variable $var not found in .env.example"
+              exit 1
+            fi
+          done
+          echo "All required environment variables found"
+          echo "::endgroup::"
+
+  # Validate configurations
+  validate:
+    name: Configuration Validation
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq yq curl
+
+      - name: Validate AdGuard configuration
+        run: |
+          echo "::group::AdGuard Configuration Validation"
+          config_file="docker/configs/adguard/AdGuardHome.yaml"
+          if [ ! -f "$config_file" ]; then
+            echo "ERROR: AdGuard config file not found"
+            exit 1
+          fi
+
+          # Check YAML syntax
+          yq eval '.' "$config_file" > /dev/null
+
+          # Validate DNS upstreams
+          upstreams=$(yq eval '.dns.upstream_dns[]' "$config_file")
+          echo "Configured DNS upstreams:"
+          echo "$upstreams"
+
+          # Check for Australian DNS servers
+          if ! echo "$upstreams" | grep -q "1.1.1.1"; then
+            echo "WARNING: Cloudflare Sydney PoP not configured"
+          fi
+          echo "::endgroup::"
+
+      - name: Validate Prometheus configuration
+        run: |
+          echo "::group::Prometheus Configuration Validation"
+          config_file="docker/configs/prometheus/prometheus.yml"
+          if [ ! -f "$config_file" ]; then
+            echo "ERROR: Prometheus config file not found"
+            exit 1
+          fi
+
+          # Download promtool for validation
+          wget -O /tmp/prometheus.tar.gz \
+            "https://github.com/prometheus/prometheus/releases/download/v2.47.0/prometheus-2.47.0.linux-amd64.tar.gz"
+          tar -xzf /tmp/prometheus.tar.gz -C /tmp
+
+          # Validate configuration
+          /tmp/prometheus-*/promtool check config "$config_file"
+          echo "::endgroup::"
+
+      - name: Validate Alertmanager configuration
+        run: |
+          echo "::group::Alertmanager Configuration Validation"
+          config_file="docker/configs/alertmanager/alertmanager.yml"
+          if [ ! -f "$config_file" ]; then
+            echo "ERROR: Alertmanager config file not found"
+            exit 1
+          fi
+
+          # Download amtool for validation
+          wget -O /tmp/alertmanager.tar.gz \
+            "https://github.com/prometheus/alertmanager/releases/download/v0.26.0/alertmanager-0.26.0.linux-amd64.tar.gz"
+          tar -xzf /tmp/alertmanager.tar.gz -C /tmp
+
+          # Validate configuration
+          /tmp/alertmanager-*/amtool check-config "$config_file"
+          echo "::endgroup::"
+
+      - name: Validate Prometheus rules
+        run: |
+          echo "::group::Prometheus Rules Validation"
+          rules_dir="docker/configs/prometheus/rules"
+          if [ ! -d "$rules_dir" ]; then
+            echo "ERROR: Prometheus rules directory not found"
+            exit 1
+          fi
+
+          # Download promtool if not already downloaded
+          if [ ! -f "/tmp/prometheus-*/promtool" ]; then
+            wget -O /tmp/prometheus.tar.gz \
+              "https://github.com/prometheus/prometheus/releases/download/v2.47.0/prometheus-2.47.0.linux-amd64.tar.gz"
+            tar -xzf /tmp/prometheus.tar.gz -C /tmp
+          fi
+
+          # Validate all rule files
+          for rule_file in "$rules_dir"/*.yml; do
+            if [ -f "$rule_file" ]; then
+              echo "Validating: $rule_file"
+              /tmp/prometheus-*/promtool check rules "$rule_file"
+            fi
+          done
+          echo "::endgroup::"
+
+  # Docker image testing
+  docker-test:
+    name: Docker Integration Test
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create test environment file
+        run: |
+          cp .env.example .env
+          # Set test values
+          sed -i 's/ADGUARD_PASSWORD=change_this_password/ADGUARD_PASSWORD=test_password_123/' .env
+          sed -i 's/GRAFANA_ADMIN_PASSWORD=change_this_password/GRAFANA_ADMIN_PASSWORD=test_password_123/' .env
+          sed -i 's/GRAFANA_SECRET_KEY=change_this_secret/GRAFANA_SECRET_KEY=test_secret_key_123/' .env
+
+      - name: Pull Docker images
+        run: |
+          cd docker
+          docker-compose pull
+
+      - name: Start services
+        run: |
+          cd docker
+          docker-compose up -d
+
+          # Wait for services to be ready
+          echo "Waiting for services to start..."
+          sleep 60
+
+      - name: Check service health
+        run: |
+          cd docker
+
+          # Check if containers are running
+          docker-compose ps
+
+          # Wait for AdGuard to be ready
+          timeout 120 bash -c 'until curl -f -s http://localhost:3000/; do sleep 5; done'
+
+          # Wait for Prometheus to be ready
+          timeout 60 bash -c 'until curl -f -s http://localhost:9090/-/healthy; do sleep 5; done'
+
+          # Wait for Grafana to be ready
+          timeout 60 bash -c 'until curl -f -s http://localhost:3001/api/health; do sleep 5; done'
+
+      - name: Test DNS functionality
+        run: |
+          # Test DNS resolution
+          dig @localhost google.com
+          dig @localhost cloudflare.com
+
+          # Test DNS blocking (should return 0.0.0.0 or NXDOMAIN)
+          result=$(dig @localhost doubleclick.net +short | head -1)
+          if [ "$result" = "0.0.0.0" ] || [ -z "$result" ]; then
+            echo "DNS blocking is working"
+          else
+            echo "WARNING: DNS blocking may not be working properly"
+          fi
+
+      - name: Test monitoring endpoints
+        run: |
+          # Test Prometheus
+          curl -f "http://localhost:9090/api/v1/query?query=up"
+
+          # Test AdGuard exporter
+          curl -f "http://localhost:9617/metrics"
+
+          # Test Node exporter
+          curl -f "http://localhost:9100/metrics"
+
+      - name: Check logs for errors
+        run: |
+          cd docker
+
+          # Check for critical errors in logs
+          if docker-compose logs | grep -i "error\|fatal\|panic" | grep -v "context canceled"; then
+            echo "WARNING: Found errors in container logs"
+          else
+            echo "No critical errors found in logs"
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          cd docker
+          docker-compose down -v
+          docker system prune -f
+
+  # Security scanning
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Scan Docker Compose file for security issues
+        run: |
+          # Install docker-bench-security
+          git clone https://github.com/docker/docker-bench-security.git /tmp/docker-bench
+
+          # Check compose file for common security issues
+          echo "Checking Docker Compose security..."
+
+          # Check for privileged containers
+          if grep -r "privileged.*true" docker/; then
+            echo "ERROR: Privileged containers found"
+            exit 1
+          fi
+
+          # Check for host network mode
+          if grep -r "network_mode.*host" docker/; then
+            echo "ERROR: Host network mode found"
+            exit 1
+          fi
+
+          # Check for volume mounts to sensitive paths
+          if grep -r "/etc:" docker/ | grep -v "ro"; then
+            echo "WARNING: Writable mounts to /etc found"
+          fi
+
+          echo "Docker Compose security check completed"
+
+      - name: Check for secrets in files
+        run: |
+          # Check for hardcoded secrets (basic patterns)
+          if grep -r -i "password.*=" . --include="*.yml" --include="*.yaml" | grep -v "change_this_password\|GRAFANA_ADMIN_PASSWORD\|ADGUARD_PASSWORD"; then
+            echo "WARNING: Possible hardcoded passwords found"
+          fi
+
+          if grep -r -i "secret.*=" . --include="*.yml" --include="*.yaml" | grep -v "change_this_secret\|GRAFANA_SECRET_KEY"; then
+            echo "WARNING: Possible hardcoded secrets found"
+          fi
+
+          echo "Secret scanning completed"
+
+  # Performance testing
+  performance:
+    name: Performance Testing
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    if: github.event_name != 'schedule'  # Skip on scheduled runs
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install performance testing tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dnsutils bind9-utils
+
+      - name: Create test environment
+        run: |
+          cp .env.example .env
+          sed -i 's/ADGUARD_PASSWORD=change_this_password/ADGUARD_PASSWORD=test_password_123/' .env
+          sed -i 's/GRAFANA_ADMIN_PASSWORD=change_this_password/GRAFANA_ADMIN_PASSWORD=test_password_123/' .env
+
+      - name: Start services
+        run: |
+          cd docker
+          docker-compose up -d
+          sleep 60
+
+      - name: DNS performance test
+        run: |
+          echo "Testing DNS performance..."
+
+          # Test DNS resolution speed
+          domains=("google.com" "github.com" "cloudflare.com" "amazon.com" "microsoft.com")
+          total_time=0
+
+          for domain in "${domains[@]}"; do
+            start_time=$(date +%s%N)
+            dig @localhost "$domain" > /dev/null
+            end_time=$(date +%s%N)
+            query_time=$(( (end_time - start_time) / 1000000 ))  # Convert to milliseconds
+            echo "Query for $domain: ${query_time}ms"
+            total_time=$((total_time + query_time))
+          done
+
+          avg_time=$((total_time / ${#domains[@]}))
+          echo "Average DNS query time: ${avg_time}ms"
+
+          # Fail if average time is too high
+          if [ $avg_time -gt 500 ]; then
+            echo "ERROR: DNS queries too slow (>${avg_time}ms)"
+            exit 1
+          fi
+
+      - name: Memory usage check
+        run: |
+          cd docker
+
+          # Check container memory usage
+          echo "Container memory usage:"
+          docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}"
+
+          # Check if any container is using too much memory
+          high_memory=$(docker stats --no-stream --format "{{.Name}}\t{{.MemPerc}}" | awk '$2+0 > 80 {print $1}')
+          if [ -n "$high_memory" ]; then
+            echo "WARNING: High memory usage detected in: $high_memory"
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          cd docker
+          docker-compose down -v
+
+  # Documentation check
+  docs:
+    name: Documentation Check
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check required documentation
+        run: |
+          required_docs=(
+            "README.md"
+            "docs/setup.md"
+            "docs/security.md"
+            "docs/troubleshooting.md"
+          )
+
+          for doc in "${required_docs[@]}"; do
+            if [ ! -f "$doc" ]; then
+              echo "ERROR: Required documentation file missing: $doc"
+              exit 1
+            fi
+          done
+
+          echo "All required documentation files found"
+
+      - name: Check script executability
+        run: |
+          scripts=(
+            "scripts/setup/install.sh"
+            "scripts/monitoring/comprehensive-monitor.sh"
+            "scripts/backup/backup.sh"
+            "scripts/maintenance/update.sh"
+            "configs/firewall/ufw-rules.sh"
+          )
+
+          for script in "${scripts[@]}"; do
+            if [ ! -x "$script" ]; then
+              echo "ERROR: Script not executable: $script"
+              exit 1
+            fi
+          done
+
+          echo "All scripts are executable"
+
+  # Notification job (runs only on failures in main branch)
+  notify:
+    name: Notify on Failure
+    runs-on: ubuntu-22.04
+    needs: [lint, validate, docker-test, security, performance, docs]
+    if: failure() && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Send notification
+        env:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data '{"text":"🚨 AdGuard Infrastructure CI failed on main branch! Check GitHub Actions for details."}' \
+              "$WEBHOOK_URL"
+          fi

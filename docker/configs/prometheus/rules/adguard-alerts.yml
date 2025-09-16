@@ -1,0 +1,302 @@
+# AdGuard Home Alerting Rules
+# Comprehensive monitoring and security alerting for DNS infrastructure
+
+groups:
+  - name: adguard.rules
+    interval: 30s
+    rules:
+      # Service Health Alerts
+      - alert: AdGuardDown
+        expr: up{job="adguard-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: adguard
+          component: dns
+        annotations:
+          summary: "AdGuard Home is down"
+          description: "AdGuard Home has been down for more than 2 minutes. DNS filtering is not working."
+          runbook: "Check AdGuard container status and logs"
+
+      - alert: AdGuardHighQueryLatency
+        expr: adguard_avg_processing_time > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: adguard
+          component: performance
+        annotations:
+          summary: "AdGuard DNS query latency is high"
+          description: "Average DNS query processing time is {{ $value }}ms, which is above 100ms threshold"
+          runbook: "Check upstream DNS servers and network connectivity"
+
+      - alert: AdGuardHighQueryVolume
+        expr: rate(adguard_num_dns_queries_total[5m]) > 100
+        for: 10m
+        labels:
+          severity: warning
+          service: adguard
+          component: security
+        annotations:
+          summary: "Unusually high DNS query volume detected"
+          description: "DNS query rate is {{ $value }} queries/second, which may indicate a DDoS attack or malware activity"
+          runbook: "Investigate DNS query logs for suspicious patterns"
+
+      - alert: AdGuardBlockedQueriesSpike
+        expr: rate(adguard_num_blocked_queries_total[5m]) > 50
+        for: 5m
+        labels:
+          severity: warning
+          service: adguard
+          component: security
+        annotations:
+          summary: "High rate of blocked DNS queries"
+          description: "Blocked query rate is {{ $value }} queries/second, possible malware or excessive advertising"
+          runbook: "Review blocked domains and check for infected devices"
+
+      - alert: AdGuardUpstreamFailure
+        expr: adguard_upstream_errors_total > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: adguard
+          component: upstream
+        annotations:
+          summary: "AdGuard upstream DNS errors detected"
+          description: "{{ $value }} upstream DNS errors in the last 5 minutes"
+          runbook: "Check upstream DNS server connectivity and configuration"
+
+      # Security Alerts
+      - alert: SuspiciousDNSActivity
+        expr: |
+          (
+            rate(adguard_num_dns_queries_total[1m]) >
+            rate(adguard_num_dns_queries_total[1h] offset 1h) * 5
+          ) and rate(adguard_num_dns_queries_total[1m]) > 10
+        for: 2m
+        labels:
+          severity: critical
+          service: adguard
+          component: security
+        annotations:
+          summary: "Suspicious DNS activity detected"
+          description: "DNS query rate is 5x higher than historical average, possible attack or compromise"
+          runbook: "Immediately investigate query logs and source IPs"
+
+      - alert: MalwareDomainQueries
+        expr: increase(adguard_num_blocked_queries_total[5m]) > 100
+        for: 2m
+        labels:
+          severity: warning
+          service: adguard
+          component: security
+        annotations:
+          summary: "High number of malware domain queries blocked"
+          description: "{{ $value }} malware domains blocked in 5 minutes, check for infected devices"
+          runbook: "Identify source IPs and scan devices for malware"
+
+      # System Resource Alerts
+      - alert: AdGuardHighMemoryUsage
+        expr: (container_memory_usage_bytes{name="adguard-home"} / container_spec_memory_limit_bytes{name="adguard-home"}) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: adguard
+          component: resources
+        annotations:
+          summary: "AdGuard Home high memory usage"
+          description: "AdGuard Home memory usage is {{ $value }}% of limit"
+          runbook: "Check for memory leaks or increase memory limit"
+
+      - alert: AdGuardHighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{name="adguard-home"}[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: adguard
+          component: resources
+        annotations:
+          summary: "AdGuard Home high CPU usage"
+          description: "AdGuard Home CPU usage is {{ $value }}%"
+          runbook: "Investigate high CPU usage causes"
+
+  - name: system.rules
+    interval: 30s
+    rules:
+      # System Health Alerts
+      - alert: HostDown
+        expr: up{job="node-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: system
+          component: host
+        annotations:
+          summary: "Host system is down"
+          description: "Host system monitoring is unreachable"
+          runbook: "Check physical server and network connectivity"
+
+      - alert: HighSystemLoad
+        expr: node_load15 > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+          component: performance
+        annotations:
+          summary: "High system load average"
+          description: "15-minute load average is {{ $value }}"
+          runbook: "Investigate high load processes"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+          component: memory
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}%"
+          runbook: "Identify memory-consuming processes"
+
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes - node_filesystem_avail_bytes) / node_filesystem_size_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+          component: storage
+        annotations:
+          summary: "High disk usage"
+          description: "Disk usage on {{ $labels.mountpoint }} is {{ $value }}%"
+          runbook: "Clean up disk space or expand storage"
+
+      - alert: DiskSpaceCritical
+        expr: (node_filesystem_size_bytes - node_filesystem_avail_bytes) / node_filesystem_size_bytes * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+          service: system
+          component: storage
+        annotations:
+          summary: "Critical disk space"
+          description: "Disk space on {{ $labels.mountpoint }} is {{ $value }}%"
+          runbook: "Immediately free up disk space"
+
+      # Network Security Alerts
+      - alert: HighNetworkTraffic
+        expr: rate(node_network_receive_bytes_total[5m]) > 100000000  # 100MB/s
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+          component: network
+        annotations:
+          summary: "High network traffic detected"
+          description: "Network receive rate is {{ $value | humanize }}B/s"
+          runbook: "Investigate network traffic sources"
+
+      - alert: SSHBruteForceAttempt
+        expr: increase(node_netstat_Tcp_InSegs[5m]) > 1000
+        for: 2m
+        labels:
+          severity: warning
+          service: system
+          component: security
+        annotations:
+          summary: "Possible SSH brute force attack"
+          description: "High number of TCP connections may indicate brute force attack"
+          runbook: "Check fail2ban logs and SSH access logs"
+
+  - name: monitoring.rules
+    interval: 30s
+    rules:
+      # Monitoring Infrastructure Alerts
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: monitoring
+          component: prometheus
+        annotations:
+          summary: "Prometheus is down"
+          description: "Prometheus monitoring is not available"
+          runbook: "Check Prometheus container and configuration"
+
+      - alert: GrafanaDown
+        expr: up{job="grafana"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: monitoring
+          component: grafana
+        annotations:
+          summary: "Grafana is down"
+          description: "Grafana dashboard is not available"
+          runbook: "Check Grafana container status"
+
+      - alert: AlertmanagerDown
+        expr: up{job="alertmanager"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: monitoring
+          component: alertmanager
+        annotations:
+          summary: "Alertmanager is down"
+          description: "Alert routing is not working"
+          runbook: "Check Alertmanager container and configuration"
+
+      - alert: PrometheusStorageSpace
+        expr: prometheus_tsdb_retention_limit_bytes / prometheus_tsdb_size_bytes < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: monitoring
+          component: storage
+        annotations:
+          summary: "Prometheus storage space low"
+          description: "Prometheus has less than 10% storage space remaining"
+          runbook: "Clean up old metrics or increase storage"
+
+  - name: docker.rules
+    interval: 30s
+    rules:
+      # Docker Container Health
+      - alert: ContainerKilled
+        expr: time() - container_last_seen > 60
+        for: 0m
+        labels:
+          severity: warning
+          service: docker
+          component: container
+        annotations:
+          summary: "Container killed"
+          description: "Container {{ $labels.name }} has disappeared"
+          runbook: "Check container logs and restart if necessary"
+
+      - alert: ContainerCpuUsage
+        expr: (sum(rate(container_cpu_usage_seconds_total[3m])) BY (instance, name) * 100) > 80
+        for: 2m
+        labels:
+          severity: warning
+          service: docker
+          component: performance
+        annotations:
+          summary: "Container CPU usage"
+          description: "Container CPU usage for {{ $labels.name }} is above 80%"
+          runbook: "Investigate high CPU usage in container"
+
+      - alert: ContainerMemoryUsage
+        expr: (sum(container_memory_working_set_bytes) BY (instance, name) / sum(container_spec_memory_limit_bytes > 0) BY (instance, name) * 100) > 80
+        for: 2m
+        labels:
+          severity: warning
+          service: docker
+          component: memory
+        annotations:
+          summary: "Container Memory usage"
+          description: "Container Memory usage for {{ $labels.name }} is above 80%"
+          runbook: "Check memory usage patterns in container"

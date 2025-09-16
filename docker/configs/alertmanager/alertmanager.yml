@@ -1,0 +1,270 @@
+# Alertmanager configuration for AdGuard Home infrastructure
+# Multi-channel alerting with escalation and grouping
+
+global:
+  smtp_smarthost: '${SMTP_HOST}:${SMTP_PORT}'
+  smtp_from: '${SMTP_FROM}'
+  smtp_auth_username: '${SMTP_USER}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+# Templates for alert formatting
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alert routing
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10m
+  repeat_interval: 12h
+  receiver: 'default-receiver'
+
+  # Routing rules
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 5s
+      repeat_interval: 5m
+      continue: true
+
+    # Security alerts - special handling
+    - match_re:
+        component: security
+      receiver: 'security-alerts'
+      group_wait: 5s
+      repeat_interval: 15m
+      continue: true
+
+    # AdGuard service alerts
+    - match:
+        service: adguard
+      receiver: 'adguard-alerts'
+      group_wait: 30s
+      repeat_interval: 1h
+
+    # System alerts
+    - match:
+        service: system
+      receiver: 'system-alerts'
+      group_wait: 1m
+      repeat_interval: 2h
+
+    # Monitoring infrastructure alerts
+    - match:
+        service: monitoring
+      receiver: 'monitoring-alerts'
+      group_wait: 2m
+      repeat_interval: 4h
+
+# Alert receivers
+receivers:
+  # Default receiver for ungrouped alerts
+  - name: 'default-receiver'
+    email_configs:
+      - to: '${SMTP_TO}'
+        subject: '[AdGuard] {{ .GroupLabels.alertname }} Alert'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Labels:
+          {{ range .Labels.SortedPairs }}  - {{ .Name }}: {{ .Value }}
+          {{ end }}
+          {{ end }}
+        headers:
+          X-Priority: '3'
+
+  # Critical alerts - multiple channels
+  - name: 'critical-alerts'
+    email_configs:
+      - to: '${SMTP_TO}'
+        subject: '[CRITICAL] AdGuard Infrastructure Alert'
+        body: |
+          🚨 CRITICAL ALERT 🚨
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Component: {{ .Labels.component }}
+
+          Runbook: {{ .Annotations.runbook }}
+
+          Started: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
+          {{ if .EndsAt }}Ended: {{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}{{ end }}
+
+          Labels:
+          {{ range .Labels.SortedPairs }}  - {{ .Name }}: {{ .Value }}
+          {{ end }}
+          {{ end }}
+        headers:
+          X-Priority: '1'
+          Importance: 'high'
+
+    # Telegram notification (if configured)
+    telegram_configs:
+      - bot_token: '${TELEGRAM_BOT_TOKEN}'
+        chat_id: '${TELEGRAM_CHAT_ID}'
+        message: |
+          🚨 *CRITICAL ALERT* 🚨
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+
+          Service: `{{ .Labels.service }}`
+          Component: `{{ .Labels.component }}`
+          {{ end }}
+        parse_mode: 'Markdown'
+
+    # Slack notification (if configured)
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts'
+        username: 'AdGuard-Alertmanager'
+        icon_emoji: ':rotating_light:'
+        color: 'danger'
+        title: 'Critical AdGuard Infrastructure Alert'
+        text: |
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
+        fields:
+          - title: 'Service'
+            value: '{{ .CommonLabels.service }}'
+            short: true
+          - title: 'Component'
+            value: '{{ .CommonLabels.component }}'
+            short: true
+
+  # Security alerts - special handling
+  - name: 'security-alerts'
+    email_configs:
+      - to: '${SMTP_TO}'
+        subject: '[SECURITY] AdGuard Security Alert'
+        body: |
+          🛡️ SECURITY ALERT 🛡️
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+
+          Immediate Action Required: {{ .Annotations.runbook }}
+
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
+
+          This alert indicates potential security issues that require immediate attention.
+
+          Labels:
+          {{ range .Labels.SortedPairs }}  - {{ .Name }}: {{ .Value }}
+          {{ end }}
+          {{ end }}
+        headers:
+          X-Priority: '1'
+
+    telegram_configs:
+      - bot_token: '${TELEGRAM_BOT_TOKEN}'
+        chat_id: '${TELEGRAM_CHAT_ID}'
+        message: |
+          🛡️ *SECURITY ALERT* 🛡️
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+
+          Action: `{{ .Annotations.runbook }}`
+          {{ end }}
+        parse_mode: 'Markdown'
+
+  # AdGuard-specific alerts
+  - name: 'adguard-alerts'
+    email_configs:
+      - to: '${SMTP_TO}'
+        subject: '[AdGuard] DNS Service Alert'
+        body: |
+          AdGuard Home DNS Service Alert
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Component: {{ .Labels.component }}
+
+          Troubleshooting: {{ .Annotations.runbook }}
+
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
+          {{ end }}
+
+  # System alerts
+  - name: 'system-alerts'
+    email_configs:
+      - to: '${SMTP_TO}'
+        subject: '[System] AdGuard Host Alert'
+        body: |
+          AdGuard Host System Alert
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Component: {{ .Labels.component }}
+
+          Action Required: {{ .Annotations.runbook }}
+
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
+          {{ end }}
+
+  # Monitoring infrastructure alerts
+  - name: 'monitoring-alerts'
+    email_configs:
+      - to: '${SMTP_TO}'
+        subject: '[Monitoring] Infrastructure Alert'
+        body: |
+          Monitoring Infrastructure Alert
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Component: {{ .Labels.component }}
+
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
+          {{ end }}
+
+# Inhibition rules to reduce alert noise
+inhibit_rules:
+  # Inhibit any warning alert if there's a critical alert with the same service
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['service', 'alertname']
+
+  # Inhibit specific alerts during maintenance
+  - source_match:
+      alertname: 'MaintenanceMode'
+    target_match_re:
+      alertname: '.*'
+    equal: ['instance']
+
+# Mute configuration
+mute_time_intervals:
+  # Maintenance window - Sydney timezone
+  - name: 'maintenance-window'
+    time_intervals:
+      - times:
+        - start_time: '03:00'
+          end_time: '05:00'
+        weekdays: ['sunday']
+        months: ['1:12']
+        location: 'Australia/Sydney'
+
+  # Business hours only for non-critical alerts
+  - name: 'business-hours-only'
+    time_intervals:
+      - times:
+        - start_time: '09:00'
+          end_time: '17:00'
+        weekdays: ['monday:friday']
+        location: 'Australia/Sydney'

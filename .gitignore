@@ -1,0 +1,55 @@
+# Environment and secrets
+.env
+*.env
+secrets/
+*.key
+*.pem
+*.crt
+*.cert
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Terraform state (if used)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Docker volumes and data
+data/
+volumes/
+backups/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# AdGuard specific
+AdGuardHome.yaml.bak
+AdGuardHome_*
+*.db
+*.db-journal
+
+# Monitoring data
+prometheus_data/
+grafana_data/
+alertmanager_data/
+
+# CI/CD artifacts
+.github_token
+deployment.log

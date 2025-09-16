@@ -1,0 +1,81 @@
+MIT License
+
+Copyright (c) 2024 AdGuard Home Infrastructure Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Third-Party Components
+
+This project includes or depends on several third-party components:
+
+### AdGuard Home
+- **License**: GNU General Public License v3.0
+- **Source**: https://github.com/AdguardTeam/AdGuardHome
+- **Copyright**: AdguardTeam
+
+### Prometheus
+- **License**: Apache License 2.0
+- **Source**: https://github.com/prometheus/prometheus
+- **Copyright**: The Prometheus Authors
+
+### Grafana
+- **License**: GNU Affero General Public License v3.0
+- **Source**: https://github.com/grafana/grafana
+- **Copyright**: Grafana Labs
+
+### Docker
+- **License**: Apache License 2.0
+- **Source**: https://github.com/docker/docker-ce
+- **Copyright**: Docker, Inc.
+
+### Ubuntu Linux
+- **License**: Various (predominantly GPL)
+- **Source**: https://ubuntu.com/
+- **Copyright**: Canonical Ltd.
+
+## Attribution
+
+This project was created specifically for Australian home networks and includes
+optimizations for Australian internet infrastructure. The configuration
+templates and documentation reflect Australian privacy laws, network topology,
+and cultural considerations.
+
+## Disclaimer
+
+This software is provided for educational and home use purposes. Users are
+responsible for ensuring compliance with local laws and regulations regarding
+DNS filtering, privacy, and network security in their jurisdiction.
+
+For Australian users, please ensure compliance with:
+- Privacy Act 1988
+- Telecommunications Consumer Protections Code
+- Australian Privacy Principles
+- Any applicable state and territory legislation
+
+The maintainers of this project are not responsible for any legal implications
+of using this software. Users should consult with legal professionals if
+uncertain about compliance requirements.
+
+## Support
+
+This project is maintained by the community. Professional support and
+consulting services may be available for enterprise deployments.
+
+Contact information and support resources can be found in the project
+documentation.

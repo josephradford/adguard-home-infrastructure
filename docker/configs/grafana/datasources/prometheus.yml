@@ -1,0 +1,41 @@
+# Grafana datasource configuration for Prometheus
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    basicAuth: false
+    withCredentials: false
+    version: 1
+    uid: prometheus
+    jsonData:
+      timeInterval: '15s'
+      queryTimeout: '60s'
+      httpMethod: 'POST'
+      manageAlerts: true
+      alertmanagerUid: 'alertmanager'
+      prometheusType: 'Prometheus'
+      prometheusVersion: '2.40.0'
+      cacheLevel: 'High'
+      disableRecordingRules: false
+      incrementalQueryOverlapWindow: '10m'
+      exemplarTraceIdDestinations:
+        - name: 'Jaeger'
+          datasourceUid: 'jaeger'
+
+  - name: Alertmanager
+    type: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    editable: true
+    basicAuth: false
+    withCredentials: false
+    version: 1
+    uid: alertmanager
+    jsonData:
+      implementation: 'prometheus'
+      handleGrafanaManagedAlerts: true
