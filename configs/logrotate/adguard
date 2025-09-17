@@ -1,0 +1,94 @@
+# AdGuard Home Infrastructure - Log Rotation Configuration
+# Rotate logs for AdGuard Home, monitoring, and system components
+
+# AdGuard Home logs
+/opt/adguard/logs/*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 644 1000 1000
+    postrotate
+        docker compose -f /opt/adguard/docker/docker-compose.yml restart adguard 2>/dev/null || true
+    endscript
+}
+
+# Installation and maintenance logs
+/opt/logs/*.log {
+    weekly
+    missingok
+    rotate 12
+    compress
+    delaycompress
+    notifempty
+    create 644 root root
+}
+
+# Monitoring logs
+/opt/monitoring/prometheus/logs/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    create 644 1000 1000
+    postrotate
+        docker compose -f /opt/adguard/docker/docker-compose.yml restart prometheus 2>/dev/null || true
+    endscript
+}
+
+# Grafana logs
+/opt/monitoring/grafana/logs/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    create 644 1000 1000
+    postrotate
+        docker compose -f /opt/adguard/docker/docker-compose.yml restart grafana 2>/dev/null || true
+    endscript
+}
+
+# Backup logs
+/opt/backups/*.log {
+    weekly
+    missingok
+    rotate 8
+    compress
+    delaycompress
+    notifempty
+    create 644 root root
+}
+
+# UFW firewall logs
+/var/log/ufw.log {
+    daily
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    create 640 syslog adm
+    postrotate
+        systemctl reload rsyslog 2>/dev/null || true
+    endscript
+}
+
+# Fail2ban logs
+/var/log/fail2ban.log {
+    daily
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload fail2ban 2>/dev/null || true
+    endscript
+}
