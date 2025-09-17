@@ -85,7 +85,15 @@ start: check-env ## Start all services
 stop: ## Stop all services
 	@echo "$(BLUE)Stopping AdGuard infrastructure services...$(NC)"
 	@cd docker && docker compose down --timeout 30
-	@echo "$(GREEN)Services stopped successfully$(NC)"
+	@echo "$(BLUE)Cleaning up docker-proxy processes...$(NC)"
+	@sudo pkill -f "docker-proxy.*:$(ADGUARD_WEB_PORT)" 2>/dev/null || true
+	@sudo pkill -f "docker-proxy.*:$(GRAFANA_PORT)" 2>/dev/null || true
+	@sudo pkill -f "docker-proxy.*:$(PROMETHEUS_PORT)" 2>/dev/null || true
+	@sudo pkill -f "docker-proxy.*:$(NODE_EXPORTER_PORT)" 2>/dev/null || true
+	@sudo pkill -f "docker-proxy.*:$(ADGUARD_EXPORTER_PORT)" 2>/dev/null || true
+	@sudo pkill -f "docker-proxy.*:$(ALERTMANAGER_PORT)" 2>/dev/null || true
+	@sudo pkill -f "docker-proxy.*:53" 2>/dev/null || true
+	@echo "$(GREEN)Services stopped and cleaned up successfully$(NC)"
 
 .PHONY: restart
 restart: ## Restart all services
@@ -469,6 +477,14 @@ firewall-reset: check-root ## Reset and reconfigure firewall
 	@echo "$(GREEN)Firewall reset completed$(NC)"
 
 ##@ Utilities
+.PHONY: cleanup-ports
+cleanup-ports: ## Force cleanup of docker-proxy port conflicts
+	@echo "$(BLUE)Force cleaning up docker-proxy processes...$(NC)"
+	@sudo pkill -f "docker-proxy" 2>/dev/null || true
+	@sudo systemctl restart docker
+	@sleep 3
+	@echo "$(GREEN)Port cleanup completed$(NC)"
+
 .PHONY: clean
 clean: ## Clean up temporary files and old images
 	@echo "$(BLUE)Cleaning up temporary files and old images...$(NC)"
