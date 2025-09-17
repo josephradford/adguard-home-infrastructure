@@ -92,6 +92,43 @@ create_directories() {
     success "Directory structure created"
 }
 
+# Install Docker from official repository
+install_docker() {
+    info "Installing Docker..."
+
+    # Remove any existing Docker installations
+    sudo apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+
+    # Add Docker's official GPG key
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+    # Add Docker repository
+    echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+        $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    # Update package index
+    sudo apt-get update
+
+    # Install Docker Engine, CLI, containerd, and Docker Compose plugin
+    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+    # Add user to docker group
+    sudo usermod -aG docker "${USER}"
+
+    # Start and enable Docker service
+    sudo systemctl start docker
+    sudo systemctl enable docker
+
+    # Test Docker installation
+    if sudo docker run --rm hello-world >/dev/null 2>&1; then
+        success "Docker installed successfully"
+    else
+        warn "Docker installed but test failed - may require logout/login"
+    fi
+}
+
 # Install system packages
 install_packages() {
     info "Installing system packages..."
@@ -99,7 +136,7 @@ install_packages() {
     # Update package index
     sudo apt-get update
 
-    # Install required packages
+    # Install basic packages first
     sudo apt-get install -y \
         curl \
         wget \
@@ -109,8 +146,6 @@ install_packages() {
         unzip \
         ufw \
         fail2ban \
-        docker.io \
-        docker compose \
         certbot \
         python3-certbot-dns-cloudflare \
         rsync \
@@ -126,18 +161,14 @@ install_packages() {
         lynis \
         tree \
         jq \
-        yq \
         shellcheck \
-        yamllint
+        yamllint \
+        ca-certificates \
+        gnupg \
+        lsb-release
 
-    # Install latest docker compose
-    local compose_version
-    compose_version=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)
-    sudo curl -L "https://github.com/docker/compose/releases/download/${compose_version}/docker compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker compose
-    sudo chmod +x /usr/local/bin/docker compose
-
-    # Add user to docker group
-    sudo usermod -aG docker "${USER}"
+    # Install Docker using official repository
+    install_docker
 
     success "System packages installed"
 }
