@@ -61,7 +61,7 @@ check_requirements() {
         exit 1
     fi
 
-    # shellcheck source=/etc/os-release
+    # shellcheck source=/dev/null
     source /etc/os-release
     if [[ "$ID" != "ubuntu" ]] || [[ "$VERSION_ID" != "24.04" ]]; then
         error "This script requires Ubuntu 24.04 LTS. Current OS: $PRETTY_NAME"

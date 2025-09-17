@@ -38,12 +38,12 @@ jobs:
     strategy:
       matrix:
         image:
-          - adguard/adguardhome:latest
-          - prom/prometheus:latest
-          - grafana/grafana-oss:latest
-          - prom/node-exporter:latest
-          - prom/alertmanager:latest
-          - ebrianne/adguard-exporter:latest
+          - adguard/adguardhome:v0.107.54
+          - prom/prometheus:v2.55.1
+          - grafana/grafana-oss:11.3.0
+          - prom/node-exporter:v1.8.2
+          - prom/alertmanager:v0.27.0
+          - ebrianne/adguard-exporter:v1.3.1
 
     steps:
       - name: Checkout repository

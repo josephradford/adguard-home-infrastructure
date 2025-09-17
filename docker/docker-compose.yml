@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # AdGuard Home DNS Server
   adguard:
-    image: adguard/adguardhome:latest
+    image: adguard/adguardhome:v0.107.54
     container_name: adguard-home
     hostname: adguard-dns
     restart: unless-stopped
@@ -60,7 +60,7 @@ services:
 
   # AdGuard Exporter for Prometheus metrics
   adguard-exporter:
-    image: ebrianne/adguard-exporter:latest
+    image: ebrianne/adguard-exporter:v1.3.1
     container_name: adguard-exporter
     restart: unless-stopped
     security_opt:
@@ -99,7 +99,7 @@ services:
 
   # Prometheus monitoring
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.55.1
     container_name: prometheus
     restart: unless-stopped
     security_opt:
@@ -155,7 +155,7 @@ services:
 
   # Grafana dashboard
   grafana:
-    image: grafana/grafana-oss:latest
+    image: grafana/grafana-oss:11.3.0
     container_name: grafana
     restart: unless-stopped
     security_opt:
@@ -217,7 +217,7 @@ services:
 
   # Node Exporter for system metrics
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.8.2
     container_name: node-exporter
     restart: unless-stopped
     security_opt:
@@ -262,7 +262,7 @@ services:
 
   # Alertmanager for alert routing
   alertmanager:
-    image: prom/alertmanager:latest
+    image: prom/alertmanager:v0.27.0
     container_name: alertmanager
     restart: unless-stopped
     security_opt:
@@ -308,7 +308,7 @@ services:
 
   # Watchtower for automatic container updates
   watchtower:
-    image: containrrr/watchtower:latest
+    image: containrrr/watchtower:1.7.1
     container_name: watchtower
     restart: unless-stopped
     security_opt:
@@ -323,9 +323,7 @@ services:
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_LABEL_ENABLE=true
       - WATCHTOWER_INCLUDE_RESTARTING=true
-      - WATCHTOWER_NOTIFICATIONS=slack
-      - WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL=${SLACK_WEBHOOK_URL}
-      - WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER=AdGuard-Watchtower
+      # Push notifications removed for simplicity
       - TZ=${TZ:-Australia/Sydney}
     networks:
       - adguard-net
