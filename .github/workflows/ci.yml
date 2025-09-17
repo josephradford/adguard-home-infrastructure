@@ -227,6 +227,29 @@ jobs:
           # Verify port 53 is available
           sudo ss -tuln | grep :53 || echo "Port 53 is now available"
 
+      - name: Create data directories and set permissions
+        run: |
+          # Create all required data directories
+          sudo mkdir -p /opt/adguard/data/{work,conf}
+          sudo mkdir -p /opt/monitoring/{prometheus,grafana,alertmanager}/data
+          sudo mkdir -p docker/data/{adguard/{work,conf},prometheus,grafana,alertmanager}
+
+          # Set ownership for containers (they run as user 1000:1000)
+          sudo chown -R 1000:1000 /opt/adguard/
+          sudo chown -R 1000:1000 /opt/monitoring/
+          sudo chown -R 1000:1000 docker/data/
+
+          # Set permissions
+          sudo chmod -R 755 /opt/adguard/
+          sudo chmod -R 755 /opt/monitoring/
+          sudo chmod -R 755 docker/data/
+
+          # Create initial AdGuard config if it doesn't exist
+          if [ ! -f docker/data/adguard/conf/AdGuardHome.yaml ]; then
+            sudo cp docker/configs/adguard/AdGuardHome.yaml docker/data/adguard/conf/ || true
+            sudo chown 1000:1000 docker/data/adguard/conf/AdGuardHome.yaml || true
+          fi
+
       - name: Start services
         run: |
           cd docker
@@ -234,17 +257,29 @@ jobs:
 
           # Wait for services to be ready
           echo "Waiting for services to start..."
-          sleep 60
+          sleep 30
 
       - name: Check service health
         run: |
           cd docker
 
-          # Check if containers are running
+          # Check if containers are running and show logs for failing ones
+          echo "=== Container Status ==="
           docker compose ps
 
-          # Wait for AdGuard to be ready
-          timeout 120 bash -c 'until curl -f -s http://localhost:3000/; do sleep 5; done'
+          echo "=== Checking for any failing containers ==="
+          if docker compose ps --format json | jq -r '.[] | select(.Health == "unhealthy" or .State == "restarting" or .State == "exited")'; then
+            echo "Found failing containers, showing logs:"
+            docker compose logs --tail=50
+          fi
+
+          # Wait for AdGuard to be ready with better error handling
+          echo "=== Waiting for AdGuard Home ==="
+          if ! timeout 180 bash -c 'until curl -f -s http://localhost:${ADGUARD_WEB_PORT:-3000}/; do echo "Waiting for AdGuard..."; sleep 10; done'; then
+            echo "AdGuard failed to start, showing logs:"
+            docker compose logs adguard
+            exit 1
+          fi
 
           # Wait for Prometheus to be ready
           timeout 60 bash -c 'until curl -f -s http://localhost:9090/-/healthy; do sleep 5; done'
