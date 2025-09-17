@@ -160,12 +160,12 @@ jobs:
           fi
 
           # Check for containers running as root
-          if ! grep -r "user:" docker/docker-compose.yml >/dev/null 2>&1; then
+          if ! grep -r "user:" docker/docker compose.yml >/dev/null 2>&1; then
             echo "::warning::Some containers may be running as root"
           fi
 
           # Check for read-only filesystems
-          if ! grep -r "read_only.*true" docker/docker-compose.yml >/dev/null 2>&1; then
+          if ! grep -r "read_only.*true" docker/docker compose.yml >/dev/null 2>&1; then
             echo "::warning::Consider using read-only filesystems"
           fi
 
@@ -254,12 +254,12 @@ jobs:
           echo "Checking for known vulnerable software versions..."
 
           # Check Docker Compose version recommendations
-          if grep -r "version.*:" docker/docker-compose.yml; then
+          if grep -r "version.*:" docker/docker compose.yml; then
             echo "Docker Compose version found"
           fi
 
           # Check for outdated base images
-          images=$(grep -r "image:" docker/docker-compose.yml | grep -v "latest" | cut -d: -f3- | sort -u)
+          images=$(grep -r "image:" docker/docker compose.yml | grep -v "latest" | cut -d: -f3- | sort -u)
           if [ -n "$images" ]; then
             echo "Specific image versions found:"
             echo "$images"
@@ -321,7 +321,7 @@ jobs:
         run: |
           echo "Analyzing exposed ports and services..."
 
-          compose_file="docker/docker-compose.yml"
+          compose_file="docker/docker compose.yml"
           if [ -f "$compose_file" ]; then
             # Extract exposed ports
             exposed_ports=$(grep -E "^\s*-\s*[\"']?[0-9]+:" "$compose_file" | sed 's/.*- *[\"'\'']*//' | sed 's/[\"'\''].*//' | sort -u)

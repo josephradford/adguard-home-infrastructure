@@ -32,7 +32,7 @@ packages:
   - ufw
   - fail2ban
   - docker.io
-  - docker-compose
+  - docker compose
   - certbot
   - python3-certbot-dns-cloudflare
   - rsync
@@ -297,9 +297,9 @@ runcmd:
   # Apply sysctl settings
   - sysctl -p /etc/sysctl.d/99-adguard.conf
 
-  # Download and install latest docker-compose
-  - curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-  - chmod +x /usr/local/bin/docker-compose
+  # Download and install latest docker compose
+  - curl -L "https://github.com/docker/compose/releases/latest/download/docker compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker compose
+  - chmod +x /usr/local/bin/docker compose
 
   # Security hardening
   - chmod 700 /home/adguard
@@ -333,7 +333,7 @@ final_message: |
   - SSH Port: 2222 (key-only authentication)
   - User: adguard (sudo access)
   - Timezone: Australia/Sydney
-  - Docker and docker-compose installed
+  - Docker and docker compose installed
   - UFW firewall configured and enabled
   - Fail2ban protection active
   - Automatic security updates enabled

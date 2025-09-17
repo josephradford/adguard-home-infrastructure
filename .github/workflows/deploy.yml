@@ -282,7 +282,7 @@ jobs:
             if [ -d "/opt/adguard-infrastructure" ]; then
               echo "Stopping current services..."
               cd /opt/adguard-infrastructure/docker
-              docker-compose down --timeout 30 || true
+              docker compose down --timeout 30 || true
               echo "Services stopped"
             else
               echo "No existing installation found"
@@ -374,10 +374,10 @@ jobs:
             cd /opt/adguard-infrastructure/docker
 
             # Pull latest images
-            docker-compose pull
+            docker compose pull
 
             # Start services
-            docker-compose up -d
+            docker compose up -d
 
             echo "Services started"
           EOF
@@ -417,9 +417,9 @@ jobs:
 
             # Check container status
             cd /opt/adguard-infrastructure/docker
-            if ! docker-compose ps | grep -q "Up"; then
+            if ! docker compose ps | grep -q "Up"; then
               echo "ERROR: Some containers are not running"
-              docker-compose ps
+              docker compose ps
               exit 1
             fi
 
@@ -559,7 +559,7 @@ jobs:
               $SSH_USER@$TARGET_HOST << 'EOF'
             # Stop current services
             cd /opt/adguard-infrastructure/docker
-            docker-compose down --timeout 30 || true
+            docker compose down --timeout 30 || true
 
             # Find most recent backup
             BACKUP_DIR=$(ls -td /opt/adguard-infrastructure-backup-* 2>/dev/null | head -1)
@@ -576,7 +576,7 @@ jobs:
 
               # Start services
               cd /opt/adguard-infrastructure/docker
-              docker-compose up -d
+              docker compose up -d
 
               echo "Rollback completed"
             else

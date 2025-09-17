@@ -175,7 +175,7 @@ sudo cloud-init -f provisioning/cloud-init/cloud-init.yaml
 sudo apt update && sudo apt upgrade -y
 
 # Install prerequisites
-sudo apt install -y git curl wget docker.io docker-compose
+sudo apt install -y git curl wget docker.io docker compose
 
 # Add user to docker group
 sudo usermod -aG docker $USER
@@ -195,7 +195,7 @@ sudo scripts/setup/install.sh
 
 # Or run components individually
 sudo configs/firewall/ufw-rules.sh
-cd docker && docker-compose up -d
+cd docker && docker compose up -d
 ```
 
 ## Configuration
@@ -532,7 +532,7 @@ time dig @8.8.8.8 google.com
 #### Step 1: Container Status
 ```bash
 # Check all containers are running
-docker-compose ps
+docker compose ps
 
 # Expected status: "Up" for all services
 ```
@@ -614,10 +614,10 @@ sudo fail2ban-client status sshd-adguard
 #### Issue: DNS Resolution Not Working
 ```bash
 # Check AdGuard service status
-docker-compose ps adguard
+docker compose ps adguard
 
 # Check AdGuard logs
-docker-compose logs adguard
+docker compose logs adguard
 
 # Verify DNS port binding
 sudo netstat -tulpn | grep :53
@@ -629,7 +629,7 @@ dig @127.0.0.1 google.com
 #### Issue: Web Interface Not Accessible
 ```bash
 # Check container status
-docker-compose ps
+docker compose ps
 
 # Check firewall rules
 sudo ufw status
@@ -638,7 +638,7 @@ sudo ufw status
 sudo netstat -tulpn | grep :3000
 
 # Check container logs
-docker-compose logs adguard
+docker compose logs adguard
 ```
 
 #### Issue: Slow DNS Resolution
@@ -675,10 +675,10 @@ docker network inspect adguard-net
 ```bash
 # Stop all services
 cd /opt/adguard-infrastructure/docker
-docker-compose down
+docker compose down
 
 # Restart all services
-docker-compose up -d
+docker compose up -d
 
 # Verify health
 make health
@@ -690,9 +690,9 @@ make health
 /opt/scripts/backup/restore.sh
 
 # Or restore specific component
-docker-compose down adguard
+docker compose down adguard
 # Restore AdGuard configuration
-docker-compose up -d adguard
+docker compose up -d adguard
 ```
 
 #### Network Recovery
@@ -728,9 +728,9 @@ docker exec adguard-home env
 journalctl -u docker -f
 
 # Service-specific logs
-docker-compose logs -f adguard
-docker-compose logs -f prometheus
-docker-compose logs -f grafana
+docker compose logs -f adguard
+docker compose logs -f prometheus
+docker compose logs -f grafana
 ```
 
 #### Performance Analysis

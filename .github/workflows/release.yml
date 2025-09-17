@@ -59,7 +59,7 @@ jobs:
           required_files=(
             "README.md"
             "CHANGELOG.md"
-            "docker/docker-compose.yml"
+            "docker/docker compose.yml"
             ".env.example"
             "Makefile"
           )
@@ -130,10 +130,10 @@ jobs:
           cd docker
 
           # Pull all images
-          docker-compose pull
+          docker compose pull
 
           # Start services
-          docker-compose up -d
+          docker compose up -d
 
           # Wait for services to be ready
           echo "Waiting for services to initialize..."
@@ -206,7 +206,7 @@ jobs:
         if: always()
         run: |
           cd docker
-          docker-compose down -v
+          docker compose down -v
           docker system prune -f
 
   # Create release artifacts
@@ -267,7 +267,7 @@ jobs:
           - Ubuntu 24.04 LTS (recommended)
           - 2GB RAM minimum, 4GB recommended
           - 20GB disk space
-          - Docker and docker-compose
+          - Docker and docker compose
 
           Australian DNS Optimization:
           This release is optimized for Australian networks with:
@@ -343,7 +343,7 @@ jobs:
           - **RAM**: 2GB minimum, 4GB recommended
           - **Storage**: 20GB minimum, 50GB recommended
           - **Network**: Static IP configuration recommended
-          - **Dependencies**: Docker and docker-compose (installed automatically)
+          - **Dependencies**: Docker and docker compose (installed automatically)
 
           ## 🚀 Quick Start
 

@@ -108,7 +108,7 @@ install_packages() {
         ufw \
         fail2ban \
         docker.io \
-        docker-compose \
+        docker compose \
         certbot \
         python3-certbot-dns-cloudflare \
         rsync \
@@ -128,11 +128,11 @@ install_packages() {
         shellcheck \
         yamllint
 
-    # Install latest docker-compose
+    # Install latest docker compose
     local compose_version
     compose_version=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)
-    sudo curl -L "https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
+    sudo curl -L "https://github.com/docker/compose/releases/download/${compose_version}/docker compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker compose
+    sudo chmod +x /usr/local/bin/docker compose
 
     # Add user to docker group
     sudo usermod -aG docker "${USER}"
@@ -248,21 +248,21 @@ deploy_containers() {
     fi
 
     # Pull latest images
-    docker-compose pull
+    docker compose pull
 
     # Start services
-    docker-compose up -d
+    docker compose up -d
 
     # Wait for services to be ready
     info "Waiting for services to start..."
     sleep 30
 
     # Verify services are running
-    if docker-compose ps | grep -q "Up"; then
+    if docker compose ps | grep -q "Up"; then
         success "Docker containers deployed successfully"
     else
         error "Some containers failed to start"
-        docker-compose logs
+        docker compose logs
         exit 1
     fi
 }
@@ -317,7 +317,7 @@ verify_installation() {
     local errors=0
 
     # Check if containers are running
-    if ! docker-compose -f "${PROJECT_ROOT}/docker/docker-compose.yml" ps | grep -q "Up"; then
+    if ! docker compose -f "${PROJECT_ROOT}/docker/docker compose.yml" ps | grep -q "Up"; then
         error "Some Docker containers are not running"
         ((errors++))
     fi

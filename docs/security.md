@@ -560,7 +560,7 @@ Level 4 - Low: Policy violations, minor anomalies
 #### Immediate Response (0-1 hours)
 ```bash
 1. Isolate affected systems
-   docker-compose down [service]
+   docker compose down [service]
 
 2. Preserve evidence
    cp /var/log/* /opt/incident-$(date +%Y%m%d)/

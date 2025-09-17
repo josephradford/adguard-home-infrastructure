@@ -5,7 +5,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 PROJECT_ROOT := $(shell pwd)
-COMPOSE_FILE := $(PROJECT_ROOT)/docker/docker-compose.yml
+COMPOSE_FILE := $(PROJECT_ROOT)/docker/docker compose.yml
 ENV_FILE := $(PROJECT_ROOT)/.env
 BACKUP_DIR := /opt/backups
 LOG_DIR := /opt/logs
@@ -68,7 +68,7 @@ config: ## Create configuration from template
 dev-setup: ## Set up development environment
 	@echo "$(BLUE)Setting up development environment...$(NC)"
 	@sudo apt-get update
-	@sudo apt-get install -y shellcheck yamllint jq yq docker.io docker-compose
+	@sudo apt-get install -y shellcheck yamllint jq yq docker.io docker compose
 	@sudo usermod -aG docker $$USER
 	@echo "$(GREEN)Development environment setup completed$(NC)"
 	@echo "$(YELLOW)Please log out and back in for Docker group membership to take effect$(NC)"
@@ -77,27 +77,27 @@ dev-setup: ## Set up development environment
 .PHONY: start
 start: check-env ## Start all services
 	@echo "$(BLUE)Starting AdGuard infrastructure services...$(NC)"
-	@cd docker && docker-compose up -d
+	@cd docker && docker compose up -d
 	@echo "$(GREEN)Services started successfully$(NC)"
 	@$(MAKE) status
 
 .PHONY: stop
 stop: ## Stop all services
 	@echo "$(BLUE)Stopping AdGuard infrastructure services...$(NC)"
-	@cd docker && docker-compose down --timeout 30
+	@cd docker && docker compose down --timeout 30
 	@echo "$(GREEN)Services stopped successfully$(NC)"
 
 .PHONY: restart
 restart: ## Restart all services
 	@echo "$(BLUE)Restarting AdGuard infrastructure services...$(NC)"
-	@cd docker && docker-compose restart
+	@cd docker && docker compose restart
 	@echo "$(GREEN)Services restarted successfully$(NC)"
 	@$(MAKE) status
 
 .PHONY: status
 status: ## Show service status
 	@echo "$(BOLD)Service Status:$(NC)"
-	@cd docker && docker-compose ps
+	@cd docker && docker compose ps
 	@echo ""
 	@echo "$(BOLD)Resource Usage:$(NC)"
 	@docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}" 2>/dev/null || echo "Docker stats unavailable"
@@ -106,10 +106,10 @@ status: ## Show service status
 logs: ## View service logs (use 'make logs service=adguard' for specific service)
 	@if [ -n "$(service)" ]; then \
 		echo "$(BLUE)Showing logs for service: $(service)$(NC)"; \
-		cd docker && docker-compose logs -f $(service); \
+		cd docker && docker compose logs -f $(service); \
 	else \
 		echo "$(BLUE)Showing logs for all services...$(NC)"; \
-		cd docker && docker-compose logs -f; \
+		cd docker && docker compose logs -f; \
 	fi
 
 ##@ Health & Monitoring
@@ -120,7 +120,7 @@ health: ## Comprehensive health check
 	@echo ""
 
 	@echo "$(BOLD)1. Container Status:$(NC)"
-	@cd docker && docker-compose ps || echo "$(RED)Failed to get container status$(NC)"
+	@cd docker && docker compose ps || echo "$(RED)Failed to get container status$(NC)"
 	@echo ""
 
 	@echo "$(BOLD)2. DNS Resolution Test:$(NC)"
@@ -257,7 +257,7 @@ update: check-root ## Update system and containers
 .PHONY: pull
 pull: ## Pull latest container images
 	@echo "$(BLUE)Pulling latest container images...$(NC)"
-	@cd docker && docker-compose pull
+	@cd docker && docker compose pull
 	@echo "$(GREEN)Images updated successfully$(NC)"
 	@echo "$(YELLOW)Run 'make restart' to use updated images$(NC)"
 
@@ -286,7 +286,7 @@ config-backup: ## Backup current configuration
 config-validate: ## Validate configuration files
 	@echo "$(BLUE)Validating configuration files...$(NC)"
 	@echo -n "  Docker Compose... "
-	@if cd docker && docker-compose config >/dev/null 2>&1; then \
+	@if cd docker && docker compose config >/dev/null 2>&1; then \
 		echo "$(GREEN)✓$(NC)"; \
 	else \
 		echo "$(RED)✗$(NC)"; \
@@ -484,7 +484,7 @@ reset: check-root ## Reset entire infrastructure (DESTRUCTIVE)
 	@echo "$(YELLOW)This action cannot be undone. Make sure you have backups!$(NC)"
 	@read -p "Type 'DESTROY' to confirm: " confirm && [ "$$confirm" = "DESTROY" ] || exit 1
 	@echo "$(BLUE)Stopping services...$(NC)"
-	@cd docker && docker-compose down -v || true
+	@cd docker && docker compose down -v || true
 	@echo "$(BLUE)Removing data directories...$(NC)"
 	@sudo rm -rf /opt/adguard/data/* /opt/monitoring/*/data/* || true
 	@echo "$(BLUE)Resetting configuration...$(NC)"
@@ -535,7 +535,7 @@ lint: ## Run code quality checks
 	fi
 
 	@echo "$(BOLD)Checking Docker Compose syntax...$(NC)"
-	@cd docker && docker-compose config >/dev/null && echo "$(GREEN)✓ Docker Compose syntax OK$(NC)" || echo "$(RED)✗ Docker Compose syntax error$(NC)"
+	@cd docker && docker compose config >/dev/null && echo "$(GREEN)✓ Docker Compose syntax OK$(NC)" || echo "$(RED)✗ Docker Compose syntax error$(NC)"
 
 .PHONY: dev-test
 dev-test: ## Run development tests

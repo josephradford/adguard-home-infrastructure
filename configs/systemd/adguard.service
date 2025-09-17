@@ -42,13 +42,13 @@ CPUQuota=200%
 TasksMax=1000
 
 # Start command
-ExecStart=/usr/local/bin/docker-compose up -d
+ExecStart=/usr/local/bin/docker compose up -d
 
 # Stop command
-ExecStop=/usr/local/bin/docker-compose down --timeout 30
+ExecStop=/usr/local/bin/docker compose down --timeout 30
 
 # Reload command (for configuration updates)
-ExecReload=/usr/local/bin/docker-compose up -d --force-recreate
+ExecReload=/usr/local/bin/docker compose up -d --force-recreate
 
 # Health check
 ExecStartPost=/bin/bash -c 'for i in {1..30}; do if curl -f -s http://localhost:3000/ >/dev/null 2>&1; then exit 0; fi; sleep 2; done; exit 1'

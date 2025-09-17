@@ -25,7 +25,7 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 make health
 
 # Check all service status
-docker-compose ps
+docker compose ps
 
 # Test DNS functionality
 dig @localhost google.com
@@ -49,13 +49,13 @@ netstat -tulpn                 # Network connections
 ```bash
 # Check system logs
 journalctl -f                  # Real-time system logs
-docker-compose logs -f         # Container logs
+docker compose logs -f         # Container logs
 tail -f /opt/logs/*.log       # Application logs
 
 # Check specific service logs
-docker-compose logs adguard
-docker-compose logs prometheus
-docker-compose logs grafana
+docker compose logs adguard
+docker compose logs prometheus
+docker compose logs grafana
 ```
 
 ### Emergency Recovery Commands
@@ -66,11 +66,11 @@ docker-compose logs grafana
 make restart
 
 # Restart specific service
-docker-compose restart adguard
+docker compose restart adguard
 
 # Full reset (nuclear option)
-docker-compose down
-docker-compose up -d
+docker compose down
+docker compose up -d
 ```
 
 #### Network Recovery
@@ -100,8 +100,8 @@ sudo netstat -tulpn | grep :53
 ss -tulpn | grep :53
 
 # Check AdGuard container
-docker-compose ps adguard
-docker-compose logs adguard
+docker compose ps adguard
+docker compose logs adguard
 
 # Test direct DNS queries
 dig @127.0.0.1 google.com
@@ -111,7 +111,7 @@ dig @192.168.1.100 google.com
 #### Solutions
 ```bash
 # Solution 1: Restart AdGuard service
-docker-compose restart adguard
+docker compose restart adguard
 
 # Solution 2: Check port conflicts
 sudo lsof -i :53
@@ -121,10 +121,10 @@ sudo lsof -i :53
 cat /opt/adguard/conf/AdGuardHome.yaml | grep -A 5 "bind_hosts"
 
 # Solution 4: Reset DNS configuration
-docker-compose down adguard
+docker compose down adguard
 rm -f /opt/adguard/conf/AdGuardHome.yaml
 cp docker/configs/adguard/AdGuardHome.yaml /opt/adguard/conf/
-docker-compose up -d adguard
+docker compose up -d adguard
 ```
 
 ### Issue: Slow DNS Resolution
@@ -157,7 +157,7 @@ DNS_UPSTREAM_2=8.8.8.8
 DNS_UPSTREAM_3=9.9.9.9
 
 # Restart AdGuard
-docker-compose restart adguard
+docker compose restart adguard
 
 # Solution 2: Increase cache settings
 # Edit AdGuard configuration
@@ -220,7 +220,7 @@ curl -X POST http://localhost:3000/control/filtering/add_url \
 #### Diagnosis
 ```bash
 # Check container status
-docker-compose ps adguard
+docker compose ps adguard
 
 # Check port binding
 sudo netstat -tulpn | grep :3000
@@ -237,7 +237,7 @@ curl -I http://127.0.0.1:3000/
 #### Solutions
 ```bash
 # Solution 1: Restart AdGuard container
-docker-compose restart adguard
+docker compose restart adguard
 
 # Solution 2: Check firewall rules
 sudo ufw allow from 192.168.0.0/16 to any port 3000
@@ -247,8 +247,8 @@ docker network ls
 docker network inspect adguard-net
 
 # Solution 4: Reset container
-docker-compose down adguard
-docker-compose up -d adguard
+docker compose down adguard
+docker compose up -d adguard
 ```
 
 ### Issue: SSH Access Problems
@@ -304,7 +304,7 @@ ssh-copy-id -i ~/.ssh/adguard_key.pub -p 2222 adguard@192.168.1.100
 #### Diagnosis
 ```bash
 # Check all monitoring containers
-docker-compose ps prometheus grafana alertmanager
+docker compose ps prometheus grafana alertmanager
 
 # Check Prometheus targets
 curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[].health'
@@ -313,24 +313,24 @@ curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[].health'
 curl -s http://localhost:3001/api/health
 
 # Check container logs
-docker-compose logs prometheus
-docker-compose logs grafana
+docker compose logs prometheus
+docker compose logs grafana
 ```
 
 #### Solutions
 ```bash
 # Solution 1: Restart monitoring stack
-docker-compose restart prometheus grafana alertmanager
+docker compose restart prometheus grafana alertmanager
 
 # Solution 2: Check configuration files
 # Validate Prometheus config
 docker exec prometheus promtool check config /etc/prometheus/prometheus.yml
 
 # Solution 3: Reset data directories
-docker-compose down
+docker compose down
 sudo rm -rf /opt/monitoring/prometheus/data/*
 sudo rm -rf /opt/monitoring/grafana/data/*
-docker-compose up -d
+docker compose up -d
 
 # Solution 4: Check networking
 docker exec prometheus wget -O- http://adguard-exporter:9617/metrics
@@ -362,7 +362,7 @@ ps aux --sort=-%cpu | head -10
 #### Solutions
 ```bash
 # Solution 1: Adjust resource limits
-# Edit docker-compose.yml
+# Edit docker compose.yml
 deploy:
   resources:
     limits:
@@ -405,7 +405,7 @@ journalctl -u docker | grep -i "oom"
 #### Solutions
 ```bash
 # Solution 1: Increase memory limits
-# Edit docker-compose.yml
+# Edit docker compose.yml
 deploy:
   resources:
     limits:
@@ -425,7 +425,7 @@ sudo mkswap /swapfile
 sudo swapon /swapfile
 
 # Solution 4: Restart high-memory containers
-docker-compose restart prometheus
+docker compose restart prometheus
 ```
 
 ### Issue: Slow Website Loading
@@ -481,10 +481,10 @@ cache_ttl_max: 3600  # 1 hour maximum
 #### Diagnosis
 ```bash
 # Check container status
-docker-compose ps
+docker compose ps
 
 # Check container logs
-docker-compose logs [service_name]
+docker compose logs [service_name]
 
 # Check for port conflicts
 sudo netstat -tulpn | grep -E ":53|:3000|:9090"
@@ -496,8 +496,8 @@ df -h
 #### Solutions
 ```bash
 # Solution 1: Restart with fresh logs
-docker-compose down [service_name]
-docker-compose up -d [service_name]
+docker compose down [service_name]
+docker compose up -d [service_name]
 
 # Solution 2: Check configuration syntax
 # For AdGuard
@@ -508,13 +508,13 @@ docker run --rm -v /opt/monitoring/prometheus:/config \
   prom/prometheus promtool check config /config/prometheus.yml
 
 # Solution 3: Reset container data
-docker-compose down [service_name]
+docker compose down [service_name]
 sudo rm -rf /opt/[service]/data/*
-docker-compose up -d [service_name]
+docker compose up -d [service_name]
 
 # Solution 4: Pull fresh images
-docker-compose pull [service_name]
-docker-compose up -d [service_name]
+docker compose pull [service_name]
+docker compose up -d [service_name]
 ```
 
 ### Issue: Container Networking Problems
@@ -541,9 +541,9 @@ docker exec adguard-home nslookup prometheus
 #### Solutions
 ```bash
 # Solution 1: Recreate network
-docker-compose down
+docker compose down
 docker network rm adguard-infrastructure_adguard-net
-docker-compose up -d
+docker compose up -d
 
 # Solution 2: Check firewall rules
 sudo ufw status
@@ -551,7 +551,7 @@ sudo ufw status
 
 # Solution 3: Restart Docker daemon
 sudo systemctl restart docker
-docker-compose up -d
+docker compose up -d
 
 # Solution 4: Check Docker daemon configuration
 cat /etc/docker/daemon.json
@@ -567,7 +567,7 @@ cat /etc/docker/daemon.json
 #### Diagnosis
 ```bash
 # Check volume mounts
-docker-compose config | grep -A 5 volumes
+docker compose config | grep -A 5 volumes
 
 # Check file permissions
 ls -la /opt/adguard/
@@ -587,11 +587,11 @@ sudo chown -R 1000:1000 /opt/monitoring/
 /opt/scripts/backup/restore.sh
 
 # Solution 3: Recreate volumes with proper ownership
-docker-compose down
+docker compose down
 sudo rm -rf /opt/adguard/data /opt/monitoring/*/data
 mkdir -p /opt/adguard/{data,conf} /opt/monitoring/{prometheus,grafana}/data
 sudo chown -R 1000:1000 /opt/adguard /opt/monitoring
-docker-compose up -d
+docker compose up -d
 
 # Solution 4: Check backup schedule
 crontab -l | grep backup
@@ -871,13 +871,13 @@ curl http://localhost:9617/metrics  # AdGuard exporter
 curl http://localhost:9100/metrics  # Node exporter
 
 # Check Prometheus logs
-docker-compose logs prometheus
+docker compose logs prometheus
 ```
 
 #### Solutions
 ```bash
 # Solution 1: Restart Prometheus
-docker-compose restart prometheus
+docker compose restart prometheus
 
 # Solution 2: Check configuration
 docker exec prometheus promtool check config /etc/prometheus/prometheus.yml
@@ -886,9 +886,9 @@ docker exec prometheus promtool check config /etc/prometheus/prometheus.yml
 docker exec prometheus wget -O- http://adguard-exporter:9617/metrics
 
 # Solution 4: Reset Prometheus data
-docker-compose down prometheus
+docker compose down prometheus
 sudo rm -rf /opt/monitoring/prometheus/data/*
-docker-compose up -d prometheus
+docker compose up -d prometheus
 ```
 
 ### Issue: Grafana Dashboards Not Loading
@@ -901,7 +901,7 @@ docker-compose up -d prometheus
 #### Diagnosis
 ```bash
 # Check Grafana logs
-docker-compose logs grafana
+docker compose logs grafana
 
 # Check data source configuration
 curl -u admin:password http://localhost:3001/api/datasources
@@ -921,9 +921,9 @@ docker exec grafana wget -O- http://prometheus:9090/api/v1/query?query=up
 # Import from dashboard ID or JSON file
 
 # Solution 3: Reset Grafana data
-docker-compose down grafana
+docker compose down grafana
 sudo rm -rf /opt/monitoring/grafana/data/*
-docker-compose up -d grafana
+docker compose up -d grafana
 
 # Solution 4: Check permissions
 sudo chown -R 472:472 /opt/monitoring/grafana/data/
@@ -945,7 +945,7 @@ curl http://localhost:9093/api/v1/status
 curl http://localhost:9090/api/v1/rules
 
 # Check Alertmanager logs
-docker-compose logs alertmanager
+docker compose logs alertmanager
 ```
 
 #### Solutions

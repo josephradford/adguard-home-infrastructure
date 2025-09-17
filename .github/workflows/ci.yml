@@ -51,7 +51,7 @@ jobs:
       - name: Lint Docker Compose files
         run: |
           echo "::group::Docker Compose Validation"
-          cd docker && docker-compose config --quiet
+          cd docker && docker compose config --quiet
           echo "::endgroup::"
 
       - name: Validate cloud-init configuration
@@ -208,12 +208,12 @@ jobs:
       - name: Pull Docker images
         run: |
           cd docker
-          docker-compose pull
+          docker compose pull
 
       - name: Start services
         run: |
           cd docker
-          docker-compose up -d
+          docker compose up -d
 
           # Wait for services to be ready
           echo "Waiting for services to start..."
@@ -224,7 +224,7 @@ jobs:
           cd docker
 
           # Check if containers are running
-          docker-compose ps
+          docker compose ps
 
           # Wait for AdGuard to be ready
           timeout 120 bash -c 'until curl -f -s http://localhost:3000/; do sleep 5; done'
@@ -265,7 +265,7 @@ jobs:
           cd docker
 
           # Check for critical errors in logs
-          if docker-compose logs | grep -i "error\|fatal\|panic" | grep -v "context canceled"; then
+          if docker compose logs | grep -i "error\|fatal\|panic" | grep -v "context canceled"; then
             echo "WARNING: Found errors in container logs"
           else
             echo "No critical errors found in logs"
@@ -275,7 +275,7 @@ jobs:
         if: always()
         run: |
           cd docker
-          docker-compose down -v
+          docker compose down -v
           docker system prune -f
 
   # Security scanning
@@ -368,7 +368,7 @@ jobs:
       - name: Start services
         run: |
           cd docker
-          docker-compose up -d
+          docker compose up -d
           sleep 60
 
       - name: DNS performance test
@@ -415,7 +415,7 @@ jobs:
         if: always()
         run: |
           cd docker
-          docker-compose down -v
+          docker compose down -v
 
   # Documentation check
   docs:

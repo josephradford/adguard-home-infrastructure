@@ -47,7 +47,7 @@ A complete Infrastructure as Code solution for AdGuard Home DNS filtering with c
 | **RAM** | 2GB | 4GB |
 | **Storage** | 20GB | 50GB |
 | **Network** | Dynamic IP | Static IP (192.168.1.100) |
-| **Dependencies** | None | Docker & docker-compose (auto-installed) |
+| **Dependencies** | None | Docker & docker compose (auto-installed) |
 
 ## 🏗️ Architecture
 
@@ -243,7 +243,7 @@ make backup
 make update
 
 # Restart specific service
-docker-compose restart adguard
+docker compose restart adguard
 
 # View detailed logs
 make logs service=adguard

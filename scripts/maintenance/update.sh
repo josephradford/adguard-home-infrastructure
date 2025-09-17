@@ -92,7 +92,7 @@ check_system_health() {
     local health_issues=0
 
     # Check if all containers are running
-    if ! docker-compose -f "${PROJECT_ROOT}/docker/docker-compose.yml" ps | grep -q "Up"; then
+    if ! docker compose -f "${PROJECT_ROOT}/docker/docker compose.yml" ps | grep -q "Up"; then
         warn "Some containers are not running"
         ((health_issues++))
     fi
@@ -205,7 +205,7 @@ update_containers() {
 
     # Get current container images
     local current_images
-    current_images=$(docker-compose config | grep "image:" | awk '{print $2}' | sort -u)
+    current_images=$(docker compose config | grep "image:" | awk '{print $2}' | sort -u)
 
     info "Current container images:"
     echo "$current_images" | while read -r image; do
@@ -214,7 +214,7 @@ update_containers() {
 
     # Pull latest images
     info "Pulling latest container images..."
-    docker-compose pull
+    docker compose pull
 
     # Check which images were updated
     local updated_images
@@ -224,10 +224,10 @@ update_containers() {
         info "Updated images found, recreating containers..."
 
         # Stop containers gracefully
-        docker-compose down --timeout 30
+        docker compose down --timeout 30
 
         # Start containers with new images
-        docker-compose up -d
+        docker compose up -d
 
         # Wait for services to be ready
         info "Waiting for services to start..."
@@ -236,7 +236,7 @@ update_containers() {
         # Verify services are running
         local retry_count=0
         while [[ $retry_count -lt 60 ]]; do
-            if docker-compose ps | grep -q "Up"; then
+            if docker compose ps | grep -q "Up"; then
                 break
             fi
             sleep 5

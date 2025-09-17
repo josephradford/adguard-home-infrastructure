@@ -87,7 +87,7 @@ backup_adguard() {
 
     # Stop AdGuard temporarily for consistent backup
     info "Stopping AdGuard Home for consistent backup..."
-    if docker-compose -f "${PROJECT_ROOT}/docker/docker-compose.yml" stop adguard 2>/dev/null; then
+    if docker compose -f "${PROJECT_ROOT}/docker/docker compose.yml" stop adguard 2>/dev/null; then
         sleep 5  # Wait for graceful shutdown
     else
         warn "Could not stop AdGuard container gracefully"
@@ -112,7 +112,7 @@ backup_adguard() {
 
     # Restart AdGuard
     info "Restarting AdGuard Home..."
-    docker-compose -f "${PROJECT_ROOT}/docker/docker-compose.yml" start adguard >/dev/null 2>&1 || true
+    docker compose -f "${PROJECT_ROOT}/docker/docker compose.yml" start adguard >/dev/null 2>&1 || true
 
     # Wait for service to be ready
     local retry_count=0
@@ -293,7 +293,7 @@ create_system_snapshot() {
         echo
         echo "=== Docker Status ==="
         docker version 2>/dev/null || echo "Docker not available"
-        docker-compose version 2>/dev/null || echo "Docker Compose not available"
+        docker compose version 2>/dev/null || echo "Docker Compose not available"
         echo
         echo "=== Running Containers ==="
         docker ps 2>/dev/null || echo "Cannot list containers"
