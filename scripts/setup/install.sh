@@ -394,12 +394,12 @@ show_completion_info() {
 
 # Main installation function
 main() {
-    info "Starting AdGuard Home Infrastructure installation..."
-    info "Installation log: ${LOG_FILE}"
-
-    # Create log directory
+    # Create log directory first (before any logging)
     sudo mkdir -p "$(dirname "${LOG_FILE}")"
     sudo chown "${USER}:${USER}" "$(dirname "${LOG_FILE}")"
+
+    info "Starting AdGuard Home Infrastructure installation..."
+    info "Installation log: ${LOG_FILE}"
 
     # Run installation steps
     check_requirements
