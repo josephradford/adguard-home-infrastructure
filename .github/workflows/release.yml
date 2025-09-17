@@ -132,6 +132,14 @@ jobs:
           # Pull all images
           docker compose pull
 
+          # Prepare DNS environment for testing
+          if systemctl is-active --quiet systemd-resolved; then
+            sudo systemctl stop systemd-resolved
+            sudo rm -f /etc/resolv.conf
+            echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+            echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf
+          fi
+
           # Start services
           docker compose up -d
 

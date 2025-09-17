@@ -214,6 +214,20 @@ jobs:
           cd docker
           docker compose pull
 
+      - name: Prepare DNS environment for testing
+        run: |
+          # Stop systemd-resolved to free up port 53
+          sudo systemctl stop systemd-resolved
+          sudo systemctl disable systemd-resolved
+
+          # Update /etc/resolv.conf to use Google DNS for CI
+          sudo rm -f /etc/resolv.conf
+          echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+          echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf
+
+          # Verify port 53 is available
+          sudo ss -tuln | grep :53 || echo "Port 53 is now available"
+
       - name: Start services
         run: |
           cd docker
@@ -368,6 +382,16 @@ jobs:
           cp .env.example .env
           sed -i 's/ADGUARD_PASSWORD=change_this_password/ADGUARD_PASSWORD=test_password_123/' .env
           sed -i 's/GRAFANA_ADMIN_PASSWORD=change_this_password/GRAFANA_ADMIN_PASSWORD=test_password_123/' .env
+
+      - name: Prepare DNS environment for performance testing
+        run: |
+          # Reuse DNS environment preparation if not already done
+          if systemctl is-active --quiet systemd-resolved; then
+            sudo systemctl stop systemd-resolved
+            sudo rm -f /etc/resolv.conf
+            echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+            echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf
+          fi
 
       - name: Start services
         run: |
