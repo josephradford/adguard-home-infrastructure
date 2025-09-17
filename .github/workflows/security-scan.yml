@@ -43,7 +43,7 @@ jobs:
           - grafana/grafana-oss:11.3.0
           - prom/node-exporter:v1.8.2
           - prom/alertmanager:v0.27.0
-          - ebrianne/adguard-exporter:v1.3.1
+          - ebrianne/adguard-exporter:latest
 
     steps:
       - name: Checkout repository

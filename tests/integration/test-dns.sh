@@ -578,7 +578,7 @@ test_security_features() {
     start_time=$(date +%s)
 
     # Send rapid queries
-    for i in {1..50}; do
+    for _ in $(seq 1 50); do
         if dns_query "google.com" >/dev/null 2>&1; then
             ((rapid_queries++))
         fi

@@ -60,7 +60,7 @@ services:
 
   # AdGuard Exporter for Prometheus metrics
   adguard-exporter:
-    image: ebrianne/adguard-exporter:v1.3.1
+    image: ebrianne/adguard-exporter:latest
     container_name: adguard-exporter
     restart: unless-stopped
     security_opt:
