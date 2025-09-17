@@ -66,7 +66,7 @@ receivers:
     email_configs:
       - to: '${SMTP_TO}'
         subject: '[AdGuard] {{ .GroupLabels.alertname }} Alert'
-        body: |
+        text: |
           {{ range .Alerts }}
           Alert: {{ .Annotations.summary }}
           Description: {{ .Annotations.description }}
@@ -82,7 +82,7 @@ receivers:
     email_configs:
       - to: '${SMTP_TO}'
         subject: '[CRITICAL] AdGuard Infrastructure Alert'
-        body: |
+        text: |
           🚨 CRITICAL ALERT 🚨
 
           {{ range .Alerts }}
@@ -112,7 +112,7 @@ receivers:
     email_configs:
       - to: '${SMTP_TO}'
         subject: '[SECURITY] AdGuard Security Alert'
-        body: |
+        text: |
           🛡️ SECURITY ALERT 🛡️
 
           {{ range .Alerts }}
@@ -140,7 +140,7 @@ receivers:
     email_configs:
       - to: '${SMTP_TO}'
         subject: '[AdGuard] DNS Service Alert'
-        body: |
+        text: |
           AdGuard Home DNS Service Alert
 
           {{ range .Alerts }}
@@ -158,7 +158,7 @@ receivers:
     email_configs:
       - to: '${SMTP_TO}'
         subject: '[System] AdGuard Host Alert'
-        body: |
+        text: |
           AdGuard Host System Alert
 
           {{ range .Alerts }}
@@ -176,7 +176,7 @@ receivers:
     email_configs:
       - to: '${SMTP_TO}'
         subject: '[Monitoring] Infrastructure Alert'
-        body: |
+        text: |
           Monitoring Infrastructure Alert
 
           {{ range .Alerts }}
