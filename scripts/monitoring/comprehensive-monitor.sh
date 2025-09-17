@@ -198,11 +198,11 @@ monitor_network_security() {
 
     # Check listening ports
     local unexpected_ports
-    unexpected_ports=$(netstat -tlnp | grep -v ":53\|:22\|:2222\|:3000\|:3001\|:9090\|:9093\|:9100\|:9617" | grep -c "LISTEN" || echo "0")
+    unexpected_ports=$(netstat -tlnp | grep -v ":53\|:22\|:${SSH_PORT:-2222}\|:${ADGUARD_WEB_PORT:-3000}\|:${GRAFANA_PORT:-3001}\|:${PROMETHEUS_PORT:-9090}\|:${ALERTMANAGER_PORT:-9093}\|:${NODE_EXPORTER_PORT:-9100}\|:${ADGUARD_EXPORTER_PORT:-9617}" | grep -c "LISTEN" || echo "0")
 
     if [[ "$unexpected_ports" -gt 0 ]]; then
         warn "Unexpected listening ports detected: ${unexpected_ports}"
-        netstat -tlnp | grep "LISTEN" | grep -v ":53\|:22\|:2222\|:3000\|:3001\|:9090\|:9093\|:9100\|:9617" >> "${ALERT_FILE}"
+        netstat -tlnp | grep "LISTEN" | grep -v ":53\|:22\|:${SSH_PORT:-2222}\|:${ADGUARD_WEB_PORT:-3000}\|:${GRAFANA_PORT:-3001}\|:${PROMETHEUS_PORT:-9090}\|:${ALERTMANAGER_PORT:-9093}\|:${NODE_EXPORTER_PORT:-9100}\|:${ADGUARD_EXPORTER_PORT:-9617}" >> "${ALERT_FILE}"
     fi
 }
 

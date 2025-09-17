@@ -155,20 +155,20 @@ backup_monitoring() {
     fi
 
     # Export Grafana dashboards
-    if curl -s -f "http://localhost:3001/api/health" >/dev/null 2>&1; then
+    if curl -s -f "http://localhost:${GRAFANA_PORT:-3001}/api/health" >/dev/null 2>&1; then
         info "Exporting Grafana dashboards..."
         mkdir -p "${monitoring_backup_dir}/grafana-exports"
 
         # Get dashboard UIDs
         local dashboards
         dashboards=$(curl -s -H "Content-Type: application/json" \
-            "http://admin:${GRAFANA_ADMIN_PASSWORD}@localhost:3001/api/search?type=dash-db" 2>/dev/null | \
+            "http://admin:${GRAFANA_ADMIN_PASSWORD}@localhost:${GRAFANA_PORT:-3001}/api/search?type=dash-db" 2>/dev/null | \
             jq -r '.[].uid' 2>/dev/null || echo "")
 
         for uid in $dashboards; do
             if [[ -n "$uid" && "$uid" != "null" ]]; then
                 curl -s -H "Content-Type: application/json" \
-                    "http://admin:${GRAFANA_ADMIN_PASSWORD}@localhost:3001/api/dashboards/uid/${uid}" \
+                    "http://admin:${GRAFANA_ADMIN_PASSWORD}@localhost:${GRAFANA_PORT:-3001}/api/dashboards/uid/${uid}" \
                     > "${monitoring_backup_dir}/grafana-exports/dashboard-${uid}.json" 2>/dev/null || true
             fi
         done

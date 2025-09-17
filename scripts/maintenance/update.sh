@@ -309,7 +309,7 @@ update_monitoring_configs() {
         cp -r "$rules_dir"/* "$running_rules_dir/" 2>/dev/null || true
 
         # Reload Prometheus configuration
-        if curl -s -X POST "http://localhost:9090/-/reload" >/dev/null 2>&1; then
+        if curl -s -X POST "http://localhost:${PROMETHEUS_PORT:-9090}/-/reload" >/dev/null 2>&1; then
             info "Prometheus configuration reloaded"
         else
             warn "Could not reload Prometheus configuration"
@@ -357,12 +357,12 @@ verify_system_after_update() {
     fi
 
     # Check monitoring services
-    if ! curl -s -f "http://localhost:9090/-/healthy" >/dev/null; then
+    if ! curl -s -f "http://localhost:${PROMETHEUS_PORT:-9090}/-/healthy" >/dev/null; then
         error "Prometheus is not healthy after update"
         ((verification_errors++))
     fi
 
-    if ! curl -s -f "http://localhost:3001/api/health" >/dev/null; then
+    if ! curl -s -f "http://localhost:${GRAFANA_PORT:-3001}/api/health" >/dev/null; then
         error "Grafana is not healthy after update"
         ((verification_errors++))
     fi

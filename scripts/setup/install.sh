@@ -393,12 +393,12 @@ verify_installation() {
     fi
 
     # Check if monitoring is working
-    if ! curl -f -s "http://localhost:9090/-/healthy" >/dev/null; then
+    if ! curl -f -s "http://localhost:${PROMETHEUS_PORT:-9090}/-/healthy" >/dev/null; then
         error "Prometheus is not healthy"
         ((errors++))
     fi
 
-    if ! curl -f -s "http://localhost:3001/api/health" >/dev/null; then
+    if ! curl -f -s "http://localhost:${GRAFANA_PORT:-3001}/api/health" >/dev/null; then
         error "Grafana is not healthy"
         ((errors++))
     fi
@@ -421,10 +421,10 @@ show_completion_info() {
     echo "=========================================="
     echo
     echo "Access URLs:"
-    echo "  AdGuard Home:  http://192.168.1.100:3000"
-    echo "  Grafana:       http://192.168.1.100:3001"
-    echo "  Prometheus:    http://192.168.1.100:9090"
-    echo "  Alertmanager:  http://192.168.1.100:9093"
+    echo "  AdGuard Home:  http://${STATIC_IP:-192.168.1.100}:${ADGUARD_WEB_PORT:-3000}"
+    echo "  Grafana:       http://${STATIC_IP:-192.168.1.100}:${GRAFANA_PORT:-3001}"
+    echo "  Prometheus:    http://${STATIC_IP:-192.168.1.100}:${PROMETHEUS_PORT:-9090}"
+    echo "  Alertmanager:  http://${STATIC_IP:-192.168.1.100}:${ALERTMANAGER_PORT:-9093}"
     echo
     echo "Credentials:"
     echo "  AdGuard Home:  admin / [check .env file]"
