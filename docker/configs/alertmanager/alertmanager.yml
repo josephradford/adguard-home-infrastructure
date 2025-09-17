@@ -65,7 +65,6 @@ receivers:
   - name: 'default-receiver'
     email_configs:
       - to: '${SMTP_TO}'
-        subject: '[AdGuard] {{ .GroupLabels.alertname }} Alert'
         text: |
           {{ range .Alerts }}
           Alert: {{ .Annotations.summary }}
@@ -75,13 +74,13 @@ receivers:
           {{ end }}
           {{ end }}
         headers:
+          Subject: '[AdGuard] {{ .GroupLabels.alertname }} Alert'
           X-Priority: '3'
 
   # Critical alerts - multiple channels
   - name: 'critical-alerts'
     email_configs:
       - to: '${SMTP_TO}'
-        subject: '[CRITICAL] AdGuard Infrastructure Alert'
         text: |
           🚨 CRITICAL ALERT 🚨
 
@@ -102,6 +101,7 @@ receivers:
           {{ end }}
           {{ end }}
         headers:
+          Subject: '[CRITICAL] AdGuard Infrastructure Alert'
           X-Priority: '1'
           Importance: 'high'
 
@@ -111,7 +111,6 @@ receivers:
   - name: 'security-alerts'
     email_configs:
       - to: '${SMTP_TO}'
-        subject: '[SECURITY] AdGuard Security Alert'
         text: |
           🛡️ SECURITY ALERT 🛡️
 
@@ -131,6 +130,7 @@ receivers:
           {{ end }}
           {{ end }}
         headers:
+          Subject: '[SECURITY] AdGuard Security Alert'
           X-Priority: '1'
 
     # Push alert configurations removed for simplicity
@@ -139,7 +139,6 @@ receivers:
   - name: 'adguard-alerts'
     email_configs:
       - to: '${SMTP_TO}'
-        subject: '[AdGuard] DNS Service Alert'
         text: |
           AdGuard Home DNS Service Alert
 
@@ -152,12 +151,13 @@ receivers:
 
           Time: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
           {{ end }}
+        headers:
+          Subject: '[AdGuard] DNS Service Alert'
 
   # System alerts
   - name: 'system-alerts'
     email_configs:
       - to: '${SMTP_TO}'
-        subject: '[System] AdGuard Host Alert'
         text: |
           AdGuard Host System Alert
 
@@ -170,12 +170,13 @@ receivers:
 
           Time: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
           {{ end }}
+        headers:
+          Subject: '[System] AdGuard Host Alert'
 
   # Monitoring infrastructure alerts
   - name: 'monitoring-alerts'
     email_configs:
       - to: '${SMTP_TO}'
-        subject: '[Monitoring] Infrastructure Alert'
         text: |
           Monitoring Infrastructure Alert
 
@@ -186,6 +187,8 @@ receivers:
 
           Time: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
           {{ end }}
+        headers:
+          Subject: '[Monitoring] Infrastructure Alert'
 
 # Inhibition rules to reduce alert noise
 inhibit_rules:
