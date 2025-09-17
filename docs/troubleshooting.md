@@ -517,6 +517,89 @@ docker compose pull [service_name]
 docker compose up -d [service_name]
 ```
 
+### Issue: Port 53 Conflict (DNS Service)
+
+#### Symptoms
+- AdGuard Home container fails to start
+- Error: "failed to set up container networking: driver failed programming external connectivity endpoint"
+- Error: "address already in use" for port 53
+- Message: "bind: address already in use"
+
+#### Diagnosis
+```bash
+# Check what service is using port 53
+sudo ss -tuln | grep :53
+sudo lsof -i :53
+
+# Check if systemd-resolved is running
+systemctl status systemd-resolved
+
+# Check DNS configuration
+cat /etc/resolv.conf
+```
+
+#### Root Cause
+Ubuntu 24.04 LTS runs `systemd-resolved` by default, which binds to port 53 and conflicts with AdGuard Home's DNS service.
+
+#### Solutions
+
+**Solution 1: Automatic Fix (Recommended)**
+The installation script now handles this automatically, but if you encounter issues:
+
+```bash
+# Stop and disable systemd-resolved
+sudo systemctl stop systemd-resolved
+sudo systemctl disable systemd-resolved
+
+# Update DNS configuration
+sudo rm -f /etc/resolv.conf
+echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf
+
+# Verify port 53 is free
+sudo ss -tuln | grep :53
+
+# Start AdGuard Home
+cd docker && docker compose up -d adguard
+```
+
+**Solution 2: Configure systemd-resolved to use different port**
+```bash
+# Edit systemd-resolved configuration
+sudo nano /etc/systemd/resolved.conf
+
+# Add these lines:
+DNS=1.1.1.1 8.8.8.8
+DNSStubListener=no
+
+# Restart systemd-resolved
+sudo systemctl restart systemd-resolved
+
+# Update resolv.conf
+sudo rm -f /etc/resolv.conf
+sudo ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf
+
+# Start AdGuard Home
+cd docker && docker compose up -d adguard
+```
+
+**Solution 3: Use alternative DNS port for AdGuard**
+```bash
+# Edit docker-compose.yml to use different port
+nano docker/docker-compose.yml
+
+# Change DNS ports from 53 to 5353:
+#   - "5353:53/tcp"
+#   - "5353:53/udp"
+
+# Configure router to use 192.168.1.100:5353 as DNS server
+```
+
+#### Prevention
+- The updated installation script automatically handles this conflict
+- Always run `make install` for new deployments
+- Consider using Solution 2 if you need to keep systemd-resolved for other services
+
 ### Issue: Container Networking Problems
 
 #### Symptoms

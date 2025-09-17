@@ -282,6 +282,29 @@ deploy_containers() {
         sed -i "s|\$2a\$10\$example_hash_replace_this|${password_hash}|" data/adguard/AdGuardHome.yaml
     fi
 
+    # Prepare DNS environment - stop systemd-resolved to free up port 53
+    info "Preparing DNS environment..."
+    if systemctl is-active --quiet systemd-resolved; then
+        info "Stopping systemd-resolved to free up port 53..."
+        sudo systemctl stop systemd-resolved
+        sudo systemctl disable systemd-resolved
+
+        # Update /etc/resolv.conf to use reliable DNS servers
+        sudo rm -f /etc/resolv.conf
+        echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+        echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf
+
+        # Verify port 53 is available
+        if sudo ss -tuln | grep :53 >/dev/null 2>&1; then
+            warn "Port 53 may still be in use by another service"
+            sudo ss -tuln | grep :53
+        else
+            success "Port 53 is now available for AdGuard Home"
+        fi
+    else
+        info "systemd-resolved is not active, port 53 should be available"
+    fi
+
     # Pull latest images
     docker compose pull
 
