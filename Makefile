@@ -481,8 +481,13 @@ firewall-reset: check-root ## Reset and reconfigure firewall
 cleanup-ports: ## Force cleanup of docker-proxy port conflicts
 	@echo "$(BLUE)Force cleaning up docker-proxy processes...$(NC)"
 	@sudo pkill -f "docker-proxy" 2>/dev/null || true
-	@sudo systemctl restart docker
-	@sleep 3
+	@echo "$(BLUE)Stopping Docker daemon...$(NC)"
+	@sudo systemctl stop docker 2>/dev/null || true
+	@sleep 2
+	@echo "$(BLUE)Starting Docker daemon...$(NC)"
+	@sudo systemctl start docker
+	@echo "$(BLUE)Waiting for Docker to be ready...$(NC)"
+	@timeout 30 bash -c 'until docker info >/dev/null 2>&1; do sleep 1; done' || (echo "$(YELLOW)Docker startup timeout - continuing anyway$(NC)")
 	@echo "$(GREEN)Port cleanup completed$(NC)"
 
 .PHONY: clean
