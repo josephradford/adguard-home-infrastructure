@@ -1,5 +1,5 @@
 #cloud-config
-# AdGuard Home Infrastructure - Ubuntu Server 22.04 LTS Cloud-Init Configuration
+# AdGuard Home Infrastructure - Ubuntu Server 24.04 LTS Cloud-Init Configuration
 # Optimized for Australian deployment with comprehensive security hardening
 
 hostname: adguard-dns

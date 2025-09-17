@@ -78,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Essential services
 
 #### Cloud-Init Provisioning
-- **Ubuntu 22.04 LTS** automated setup
+- **Ubuntu 24.04 LTS** automated setup
 - **Static IP** configuration (192.168.1.100/24)
 - **Security Hardening** during provisioning
   - SSH configuration with custom port
@@ -274,15 +274,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - None currently identified
 
 ### Dependencies
-- **Operating System**: Ubuntu 22.04 LTS (recommended)
+- **Operating System**: Ubuntu 24.04 LTS (recommended)
 - **Container Runtime**: Docker 20.10+ and Docker Compose 2.0+
 - **System Requirements**: 2GB RAM minimum, 4GB recommended
 - **Network**: Static IP recommended for optimal performance
 
 ### Compatibility
-- **Primary Platform**: Ubuntu 22.04 LTS
-- **Tested Platforms**: Debian 11+, Ubuntu 20.04+
-- **Architecture**: x86_64 (primary), ARM64 (community support)
+- **Supported Platform**: Ubuntu 24.04 LTS
+- **Architecture**: x86_64, ARM64
 - **Network**: IPv4 (full support), IPv6 (basic support)
 
 ### Contributors

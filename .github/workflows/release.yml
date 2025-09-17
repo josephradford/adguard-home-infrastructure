@@ -28,7 +28,7 @@ jobs:
   # Validate release
   validate:
     name: Validate Release
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -97,7 +97,7 @@ jobs:
   # Run full test suite
   test:
     name: Full Test Suite
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: validate
 
@@ -213,7 +213,7 @@ jobs:
   # Create release artifacts
   build-artifacts:
     name: Build Release Artifacts
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs: [validate, test]
 
@@ -265,7 +265,7 @@ jobs:
           For detailed instructions, see docs/setup.md
 
           System Requirements:
-          - Ubuntu 22.04 LTS (recommended)
+          - Ubuntu 24.04 LTS (recommended)
           - 2GB RAM minimum, 4GB recommended
           - 20GB disk space
           - Docker and docker-compose
@@ -315,7 +315,7 @@ jobs:
           - **Complete monitoring stack** (Prometheus, Grafana, Alertmanager)
           - **Security hardening** with UFW firewall and Fail2ban
           - **Automated backups** with encryption and retention management
-          - **Cloud-init provisioning** for Ubuntu 22.04 LTS
+          - **Cloud-init provisioning** for Ubuntu 24.04 LTS
 
           ### Australian Optimization
           - Cloudflare Sydney PoP as primary DNS upstream
@@ -340,7 +340,7 @@ jobs:
 
           ## 📋 System Requirements
 
-          - **OS**: Ubuntu 22.04 LTS (recommended)
+          - **OS**: Ubuntu 24.04 LTS (recommended)
           - **RAM**: 2GB minimum, 4GB recommended
           - **Storage**: 20GB minimum, 50GB recommended
           - **Network**: Static IP configuration recommended
@@ -420,7 +420,7 @@ jobs:
 
           **Checksums**: See `checksums.txt` for file integrity verification
           **License**: MIT License
-          **Supported Platforms**: Ubuntu 22.04 LTS (primary), Debian 11+ (community)
+          **Supported Platform**: Ubuntu 24.04 LTS
           EOF
 
       - name: Upload artifacts
@@ -436,7 +436,7 @@ jobs:
   # Create GitHub release
   release:
     name: Create GitHub Release
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [validate, test, build-artifacts]
 
@@ -474,7 +474,7 @@ jobs:
   # Update documentation
   update-docs:
     name: Update Documentation
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: release
     if: success()
 
@@ -516,7 +516,7 @@ jobs:
   # Post-release notifications
   notify:
     name: Post-Release Notifications
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [release, update-docs]
     if: success()
 
@@ -604,7 +604,7 @@ jobs:
   # Deployment to demo environment (optional)
   deploy-demo:
     name: Deploy to Demo Environment
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: release
     if: success() && github.ref == 'refs/heads/main'
     environment: demo

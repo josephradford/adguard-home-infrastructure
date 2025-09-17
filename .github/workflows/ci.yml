@@ -18,7 +18,7 @@ jobs:
   # Code quality and linting
   lint:
     name: Code Quality & Linting
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -88,7 +88,7 @@ jobs:
   # Validate configurations
   validate:
     name: Configuration Validation
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     steps:
@@ -187,7 +187,7 @@ jobs:
   # Docker image testing
   docker-test:
     name: Docker Integration Test
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     steps:
@@ -281,7 +281,7 @@ jobs:
   # Security scanning
   security:
     name: Security Scanning
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     steps:
@@ -346,7 +346,7 @@ jobs:
   # Performance testing
   performance:
     name: Performance Testing
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     if: github.event_name != 'schedule'  # Skip on scheduled runs
 
@@ -420,7 +420,7 @@ jobs:
   # Documentation check
   docs:
     name: Documentation Check
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -467,7 +467,7 @@ jobs:
   # Notification job (runs only on failures in main branch)
   notify:
     name: Notify on Failure
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [lint, validate, docker-test, security, performance, docs]
     if: failure() && github.ref == 'refs/heads/main'
 

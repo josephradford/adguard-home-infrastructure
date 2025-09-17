@@ -13,7 +13,7 @@ A complete Infrastructure as Code solution for AdGuard Home DNS filtering with c
 - **Complete monitoring stack** (Prometheus, Grafana, Alertmanager)
 - **Security hardening** with UFW firewall and Fail2ban protection
 - **Automated backups** with encryption and retention management
-- **Cloud-init provisioning** for Ubuntu 22.04 LTS
+- **Cloud-init provisioning** for Ubuntu 24.04 LTS
 - **Container security** with non-root users and read-only filesystems
 
 ### Australian Network Optimization 🇦🇺
@@ -43,7 +43,7 @@ A complete Infrastructure as Code solution for AdGuard Home DNS filtering with c
 
 | Component | Minimum | Recommended |
 |-----------|---------|-------------|
-| **OS** | Ubuntu 22.04 LTS | Ubuntu 22.04 LTS |
+| **OS** | Ubuntu 24.04 LTS | Ubuntu 24.04 LTS |
 | **RAM** | 2GB | 4GB |
 | **Storage** | 20GB | 50GB |
 | **Network** | Dynamic IP | Static IP (192.168.1.100) |

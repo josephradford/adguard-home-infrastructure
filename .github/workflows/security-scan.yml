@@ -32,7 +32,7 @@ jobs:
   # Container vulnerability scanning
   container-scan:
     name: Container Vulnerability Scan
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     strategy:
@@ -87,7 +87,7 @@ jobs:
   # Infrastructure security scanning
   infrastructure-scan:
     name: Infrastructure Security Scan
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     steps:
@@ -211,7 +211,7 @@ jobs:
   # Dependency vulnerability scanning
   dependency-scan:
     name: Dependency Vulnerability Scan
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -270,7 +270,7 @@ jobs:
   # Network security analysis
   network-security:
     name: Network Security Analysis
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     if: github.event.inputs.scan_type != 'quick'
 
@@ -344,7 +344,7 @@ jobs:
   # Configuration security audit
   config-audit:
     name: Configuration Security Audit
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -421,7 +421,7 @@ jobs:
   # Security report generation
   security-report:
     name: Generate Security Report
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [container-scan, infrastructure-scan, dependency-scan, network-security, config-audit]
     if: always()
     timeout-minutes: 5
@@ -480,7 +480,7 @@ jobs:
   # Notify security team on critical findings
   security-notification:
     name: Security Notification
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [container-scan, infrastructure-scan, dependency-scan, network-security, config-audit]
     if: failure() && (github.ref == 'refs/heads/main' || github.event_name == 'schedule')
 

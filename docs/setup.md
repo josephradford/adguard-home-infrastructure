@@ -20,7 +20,7 @@ This comprehensive guide will walk you through setting up AdGuard Home Infrastru
 
 | Component | Minimum | Recommended |
 |-----------|---------|-------------|
-| **Operating System** | Ubuntu 22.04 LTS | Ubuntu 22.04 LTS |
+| **Operating System** | Ubuntu 24.04 LTS | Ubuntu 24.04 LTS |
 | **RAM** | 2GB | 4GB |
 | **Storage** | 20GB available | 50GB available |
 | **CPU** | 2 cores | 4 cores |

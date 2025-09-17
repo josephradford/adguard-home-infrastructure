@@ -44,7 +44,7 @@ jobs:
   # Pre-deployment validation
   pre-deploy:
     name: Pre-Deployment Validation
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       target_host: ${{ steps.config.outputs.target_host }}
@@ -118,7 +118,7 @@ jobs:
   # Create pre-deployment backup
   backup:
     name: Pre-Deployment Backup
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: pre-deploy
     if: github.event.inputs.skip_backup != 'true'
     timeout-minutes: 20
@@ -176,7 +176,7 @@ jobs:
   # Deploy infrastructure
   deploy:
     name: Deploy Infrastructure
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [pre-deploy, backup]
     if: always() && (needs.backup.result == 'success' || needs.backup.result == 'skipped')
     timeout-minutes: 30
@@ -385,7 +385,7 @@ jobs:
   # Post-deployment health checks
   health-check:
     name: Post-Deployment Health Check
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [pre-deploy, deploy]
     timeout-minutes: 15
 
@@ -531,7 +531,7 @@ jobs:
   # Rollback on failure
   rollback:
     name: Rollback on Failure
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [pre-deploy, deploy, health-check]
     if: failure() && needs.deploy.result == 'success'
     timeout-minutes: 15
@@ -618,7 +618,7 @@ jobs:
   # Cleanup old backups
   cleanup:
     name: Cleanup Old Resources
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [pre-deploy, health-check]
     if: success()
     timeout-minutes: 10
@@ -662,7 +662,7 @@ jobs:
   # Post-deployment notifications
   notify:
     name: Deployment Notification
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [pre-deploy, deploy, health-check, cleanup]
     if: always()
 

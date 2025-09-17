@@ -56,18 +56,14 @@ check_requirements() {
 
     # Check OS
     if [[ ! -f /etc/os-release ]]; then
-        error "Cannot detect OS. This script is designed for Ubuntu 22.04 LTS."
+        error "Cannot detect OS. This script is designed for Ubuntu 24.04 LTS."
         exit 1
     fi
 
     source /etc/os-release
-    if [[ "$ID" != "ubuntu" ]] || [[ "$VERSION_ID" != "22.04" ]]; then
-        warn "This script is optimized for Ubuntu 22.04 LTS. Current OS: $PRETTY_NAME"
-        read -p "Continue anyway? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
-        fi
+    if [[ "$ID" != "ubuntu" ]] || [[ "$VERSION_ID" != "24.04" ]]; then
+        error "This script requires Ubuntu 24.04 LTS. Current OS: $PRETTY_NAME"
+        exit 1
     fi
 
     # Check architecture
