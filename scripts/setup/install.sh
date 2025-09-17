@@ -381,7 +381,7 @@ verify_installation() {
     fi
 
     # Check if AdGuard is responding
-    if ! curl -f -s "http://localhost:3000/" >/dev/null; then
+    if ! curl -f -s "http://localhost:${ADGUARD_WEB_PORT:-3000}/" >/dev/null; then
         error "AdGuard Home web interface is not accessible"
         ((errors++))
     fi

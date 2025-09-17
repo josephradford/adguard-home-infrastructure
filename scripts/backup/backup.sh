@@ -119,7 +119,7 @@ backup_adguard() {
     # Wait for service to be ready
     local retry_count=0
     while [[ $retry_count -lt 30 ]]; do
-        if curl -s -f "http://localhost:3000/" >/dev/null 2>&1; then
+        if curl -s -f "http://localhost:${ADGUARD_WEB_PORT:-3000}/" >/dev/null 2>&1; then
             success "AdGuard Home restarted successfully"
             break
         fi

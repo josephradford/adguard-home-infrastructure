@@ -214,10 +214,10 @@ metrics: ## Show key metrics
 	@echo "=================================="
 	@echo ""
 
-	@if curl -s -m 5 http://localhost:9617/metrics >/dev/null 2>&1; then \
+	@if curl -s -m 5 http://localhost:${ADGUARD_EXPORTER_PORT:-9617}/metrics >/dev/null 2>&1; then \
 		echo "$(BOLD)DNS Metrics:$(NC)"; \
-		queries=$$(curl -s http://localhost:9617/metrics | grep "adguard_num_dns_queries" | grep -v "#" | awk '{print $$2}' || echo "N/A"); \
-		blocked=$$(curl -s http://localhost:9617/metrics | grep "adguard_num_blocked_filtering" | grep -v "#" | awk '{print $$2}' || echo "N/A"); \
+		queries=$$(curl -s http://localhost:${ADGUARD_EXPORTER_PORT:-9617}/metrics | grep "adguard_num_dns_queries" | grep -v "#" | awk '{print $$2}' || echo "N/A"); \
+		blocked=$$(curl -s http://localhost:${ADGUARD_EXPORTER_PORT:-9617}/metrics | grep "adguard_num_blocked_filtering" | grep -v "#" | awk '{print $$2}' || echo "N/A"); \
 		echo "  Total DNS Queries: $$queries"; \
 		echo "  Blocked Queries: $$blocked"; \
 		if [ "$$queries" != "N/A" ] && [ "$$blocked" != "N/A" ] && [ $$queries -gt 0 ]; then \

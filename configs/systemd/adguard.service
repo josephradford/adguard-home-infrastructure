@@ -51,7 +51,7 @@ ExecStop=/usr/local/bin/docker compose down --timeout 30
 ExecReload=/usr/local/bin/docker compose up -d --force-recreate
 
 # Health check
-ExecStartPost=/bin/bash -c 'for i in {1..30}; do if curl -f -s http://localhost:3000/ >/dev/null 2>&1; then exit 0; fi; sleep 2; done; exit 1'
+ExecStartPost=/bin/bash -c 'for i in {1..30}; do if curl -f -s http://localhost:${ADGUARD_WEB_PORT:-3000}/ >/dev/null 2>&1; then exit 0; fi; sleep 2; done; exit 1'
 
 # Restart policy
 Restart=on-failure

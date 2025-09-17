@@ -80,14 +80,14 @@ check_adguard_health() {
     fi
 
     # Check web interface
-    if ! timeout 5 curl -s -f "http://localhost:3000/" >/dev/null; then
+    if ! timeout 5 curl -s -f "http://localhost:${ADGUARD_WEB_PORT:-3000}/" >/dev/null; then
         alert "AdGuard web interface is not accessible!"
         web_response=1
     fi
 
     # Check query processing time
     local processing_time
-    processing_time=$(curl -s "http://localhost:3000/control/stats" 2>/dev/null | jq -r '.avg_processing_time // 0' 2>/dev/null || echo "0")
+    processing_time=$(curl -s "http://localhost:${ADGUARD_WEB_PORT:-3000}/control/stats" 2>/dev/null | jq -r '.avg_processing_time // 0' 2>/dev/null || echo "0")
 
     if (( $(echo "$processing_time > 100" | bc -l 2>/dev/null || echo "0") )); then
         warn "High DNS processing time: ${processing_time}ms"
@@ -105,7 +105,7 @@ monitor_dns_patterns() {
 
     # Get current query stats from AdGuard
     local stats_json
-    if ! stats_json=$(curl -s "http://localhost:3000/control/stats" 2>/dev/null); then
+    if ! stats_json=$(curl -s "http://localhost:${ADGUARD_WEB_PORT:-3000}/control/stats" 2>/dev/null); then
         warn "Could not retrieve AdGuard stats"
         return 1
     fi
@@ -405,8 +405,8 @@ generate_health_report() {
         echo "    \"grafana_running\": $(docker ps | grep -q "grafana.*Up" && echo "true" || echo "false")"
         echo "  },"
         echo "  \"dns\": {"
-        echo "    \"queries_today\": $(curl -s "http://localhost:3000/control/stats" 2>/dev/null | jq -r '.num_dns_queries // 0'),"
-        echo "    \"blocked_today\": $(curl -s "http://localhost:3000/control/stats" 2>/dev/null | jq -r '.num_blocked_filtering // 0')"
+        echo "    \"queries_today\": $(curl -s "http://localhost:${ADGUARD_WEB_PORT:-3000}/control/stats" 2>/dev/null | jq -r '.num_dns_queries // 0'),"
+        echo "    \"blocked_today\": $(curl -s "http://localhost:${ADGUARD_WEB_PORT:-3000}/control/stats" 2>/dev/null | jq -r '.num_blocked_filtering // 0')"
         echo "  }"
         echo "}"
     } > "$report_file"

@@ -273,14 +273,14 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=64m
     ports:
-      - "9093:9093"
+      - "${ALERTMANAGER_PORT:-9093}:9093"
     volumes:
       - ./configs/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - ./data/alertmanager:/alertmanager:rw
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--storage.path=/alertmanager'
-      - '--web.external-url=http://${STATIC_IP:-192.168.1.100}:9093'
+      - '--web.external-url=http://${STATIC_IP:-192.168.1.100}:${ALERTMANAGER_PORT:-9093}'
       - '--log.level=info'
     networks:
       - adguard-net

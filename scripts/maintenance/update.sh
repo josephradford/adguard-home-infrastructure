@@ -100,7 +100,7 @@ check_system_health() {
     fi
 
     # Check AdGuard health
-    if ! curl -s -f "http://localhost:3000/" >/dev/null; then
+    if ! curl -s -f "http://localhost:${ADGUARD_WEB_PORT:-3000}/" >/dev/null; then
         warn "AdGuard web interface is not accessible"
         ((health_issues++))
     fi
@@ -287,7 +287,7 @@ update_filter_lists() {
     info "Updating AdGuard filter lists..."
 
     # Use AdGuard API to update filters
-    local api_url="http://localhost:3000/control/filtering/refresh"
+    local api_url="http://localhost:${ADGUARD_WEB_PORT:-3000}/control/filtering/refresh"
 
     if curl -s -X POST "$api_url" >/dev/null 2>&1; then
         success "Filter lists updated successfully"
@@ -345,7 +345,7 @@ verify_system_after_update() {
     fi
 
     # Check AdGuard health
-    if ! curl -s -f "http://localhost:3000/" >/dev/null; then
+    if ! curl -s -f "http://localhost:${ADGUARD_WEB_PORT:-3000}/" >/dev/null; then
         error "AdGuard web interface is not accessible after update"
         ((verification_errors++))
     fi
