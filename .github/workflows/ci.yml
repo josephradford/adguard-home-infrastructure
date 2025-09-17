@@ -98,7 +98,11 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq yq curl
+          sudo apt-get install -y jq curl
+
+          # Install yq v4 (Go version) for YAML processing
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
 
       - name: Validate AdGuard configuration
         run: |
