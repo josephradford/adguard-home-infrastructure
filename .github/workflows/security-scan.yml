@@ -49,26 +49,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Sanitize image name for filename
+        id: sanitize
+        run: |
+          # Replace invalid filename characters with underscores
+          SANITIZED_NAME=$(echo "${{ matrix.image }}" | sed 's/[:\/]/_/g')
+          echo "sanitized_name=$SANITIZED_NAME" >> $GITHUB_OUTPUT
+          echo "Sanitized filename: $SANITIZED_NAME"
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ matrix.image }}
           format: 'sarif'
-          output: 'trivy-${{ matrix.image }}-results.sarif'
+          output: 'trivy-${{ steps.sanitize.outputs.sanitized_name }}-results.sarif'
           severity: 'HIGH,CRITICAL'
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v2
         if: always()
         with:
-          sarif_file: 'trivy-${{ matrix.image }}-results.sarif'
-          category: 'container-${{ matrix.image }}'
+          sarif_file: 'trivy-${{ steps.sanitize.outputs.sanitized_name }}-results.sarif'
+          category: 'container-${{ steps.sanitize.outputs.sanitized_name }}'
 
       - name: Check for critical vulnerabilities
         run: |
           # Extract critical vulnerabilities count
-          critical_count=$(grep -o '"level": "error"' "trivy-${{ matrix.image }}-results.sarif" | wc -l || echo "0")
-          high_count=$(grep -o '"level": "warning"' "trivy-${{ matrix.image }}-results.sarif" | wc -l || echo "0")
+          SARIF_FILE="trivy-${{ steps.sanitize.outputs.sanitized_name }}-results.sarif"
+          critical_count=$(grep -o '"level": "error"' "$SARIF_FILE" | wc -l || echo "0")
+          high_count=$(grep -o '"level": "warning"' "$SARIF_FILE" | wc -l || echo "0")
 
           echo "Critical vulnerabilities: $critical_count"
           echo "High vulnerabilities: $high_count"
