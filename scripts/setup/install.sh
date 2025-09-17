@@ -254,11 +254,11 @@ configure_security() {
     sudo systemctl enable unattended-upgrades
     echo 'Unattended-Upgrade::Automatic-Reboot "false";' | sudo tee -a /etc/apt/apt.conf.d/50unattended-upgrades
 
-    # Initialize AIDE
-    if command -v aide >/dev/null 2>&1; then
-        sudo aideinit
-        sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db 2>/dev/null || true
-    fi
+    # Initialize AIDE (temporarily disabled)
+    # if command -v aide >/dev/null 2>&1; then
+    #     sudo aideinit
+    #     sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db 2>/dev/null || true
+    # fi
 
     success "Security hardening configured"
 }
