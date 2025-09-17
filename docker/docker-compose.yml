@@ -266,9 +266,10 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    cap_drop:
-      - ALL
-    read_only: true
+    # Temporarily commented out for installation troubleshooting
+    # cap_drop:
+    #   - ALL
+    # read_only: true
     user: "1000:1000"
     tmpfs:
       - /tmp:noexec,nosuid,size=64m
