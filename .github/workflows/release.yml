@@ -59,7 +59,7 @@ jobs:
           required_files=(
             "README.md"
             "CHANGELOG.md"
-            "docker/docker compose.yml"
+            "docker/docker-compose.yml"
             ".env.example"
             "Makefile"
           )

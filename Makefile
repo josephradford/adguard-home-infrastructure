@@ -5,7 +5,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 PROJECT_ROOT := $(shell pwd)
-COMPOSE_FILE := $(PROJECT_ROOT)/docker/docker compose.yml
+COMPOSE_FILE := $(PROJECT_ROOT)/docker/docker-compose.yml
 ENV_FILE := $(PROJECT_ROOT)/.env
 BACKUP_DIR := /opt/backups
 LOG_DIR := /opt/logs

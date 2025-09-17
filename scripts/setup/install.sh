@@ -319,7 +319,7 @@ verify_installation() {
     local errors=0
 
     # Check if containers are running
-    if ! docker compose -f "${PROJECT_ROOT}/docker/docker compose.yml" ps | grep -q "Up"; then
+    if ! docker compose -f "${PROJECT_ROOT}/docker/docker-compose.yml" ps | grep -q "Up"; then
         error "Some Docker containers are not running"
         ((errors++))
     fi

@@ -94,7 +94,7 @@ check_system_health() {
     local health_issues=0
 
     # Check if all containers are running
-    if ! docker compose -f "${PROJECT_ROOT}/docker/docker compose.yml" ps | grep -q "Up"; then
+    if ! docker compose -f "${PROJECT_ROOT}/docker/docker-compose.yml" ps | grep -q "Up"; then
         warn "Some containers are not running"
         ((health_issues++))
     fi
