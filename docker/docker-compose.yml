@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # AdGuard Home DNS Server
   adguard:
-    image: adguard/adguardhome:v0.107.54
+    image: adguard/adguardhome:latest
     container_name: adguard-home
     hostname: adguard-dns
     restart: unless-stopped
@@ -99,7 +99,7 @@ services:
 
   # Prometheus monitoring
   prometheus:
-    image: prom/prometheus:v2.55.1
+    image: prom/prometheus:latest
     container_name: prometheus
     restart: unless-stopped
     security_opt:
@@ -156,7 +156,7 @@ services:
 
   # Grafana dashboard
   grafana:
-    image: grafana/grafana-oss:11.3.0
+    image: grafana/grafana-oss:latest
     container_name: grafana
     restart: unless-stopped
     security_opt:
@@ -218,7 +218,7 @@ services:
 
   # Node Exporter for system metrics
   node-exporter:
-    image: prom/node-exporter:v1.8.2
+    image: prom/node-exporter:latest
     container_name: node-exporter
     restart: unless-stopped
     security_opt:
@@ -263,7 +263,7 @@ services:
 
   # Alertmanager for alert routing
   alertmanager:
-    image: prom/alertmanager:v0.27.0
+    image: prom/alertmanager:latest
     container_name: alertmanager
     restart: unless-stopped
     security_opt:
@@ -310,7 +310,7 @@ services:
 
   # Watchtower for automatic container updates
   watchtower:
-    image: containrrr/watchtower:1.7.1
+    image: containrrr/watchtower:latest
     container_name: watchtower
     restart: unless-stopped
     security_opt:
