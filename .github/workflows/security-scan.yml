@@ -65,32 +65,49 @@ jobs:
           output: 'trivy-${{ steps.sanitize.outputs.sanitized_name }}-results.sarif'
           severity: 'HIGH,CRITICAL'
 
+      - name: Debug scan results
+        if: always()
+        run: |
+          echo "Expected file: trivy-${{ steps.sanitize.outputs.sanitized_name }}-results.sarif"
+          echo "Files in current directory:"
+          ls -la *.sarif || echo "No SARIF files found"
+          echo "All files:"
+          ls -la
+
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('trivy-${{ steps.sanitize.outputs.sanitized_name }}-results.sarif') != ''
         with:
           sarif_file: 'trivy-${{ steps.sanitize.outputs.sanitized_name }}-results.sarif'
           category: 'container-${{ steps.sanitize.outputs.sanitized_name }}'
 
       - name: Check for critical vulnerabilities
+        if: always()
         run: |
           # Extract critical vulnerabilities count
           SARIF_FILE="trivy-${{ steps.sanitize.outputs.sanitized_name }}-results.sarif"
-          critical_count=$(grep -o '"level": "error"' "$SARIF_FILE" | wc -l || echo "0")
-          high_count=$(grep -o '"level": "warning"' "$SARIF_FILE" | wc -l || echo "0")
 
-          echo "Critical vulnerabilities: $critical_count"
-          echo "High vulnerabilities: $high_count"
+          if [ -f "$SARIF_FILE" ]; then
+            critical_count=$(grep -o '"level": "error"' "$SARIF_FILE" | wc -l || echo "0")
+            high_count=$(grep -o '"level": "warning"' "$SARIF_FILE" | wc -l || echo "0")
 
-          # Create summary
-          echo "## Security Scan Results for ${{ matrix.image }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Critical: $critical_count" >> $GITHUB_STEP_SUMMARY
-          echo "- High: $high_count" >> $GITHUB_STEP_SUMMARY
+            echo "Critical vulnerabilities: $critical_count"
+            echo "High vulnerabilities: $high_count"
 
-          # Fail if critical vulnerabilities found
-          if [ "$critical_count" -gt 0 ]; then
-            echo "::error::Critical vulnerabilities found in ${{ matrix.image }}"
-            exit 1
+            # Create summary
+            echo "## Security Scan Results for ${{ matrix.image }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Critical: $critical_count" >> $GITHUB_STEP_SUMMARY
+            echo "- High: $high_count" >> $GITHUB_STEP_SUMMARY
+
+            # Fail if critical vulnerabilities found
+            if [ "$critical_count" -gt 0 ]; then
+              echo "::error::Critical vulnerabilities found in ${{ matrix.image }}"
+              exit 1
+            fi
+          else
+            echo "::warning::SARIF file not found: $SARIF_FILE"
+            echo "## Security Scan Results for ${{ matrix.image }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Status: Scan file not generated" >> $GITHUB_STEP_SUMMARY
           fi
 
   # Infrastructure security scanning
