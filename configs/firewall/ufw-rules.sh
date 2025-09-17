@@ -32,7 +32,7 @@ success() { log "SUCCESS" "${GREEN}$*${NC}"; }
 # Load environment variables if available
 if [[ -f "/opt/adguard/.env" ]]; then
     set -a
-    # shellcheck source=/opt/adguard/.env
+    # shellcheck source=/dev/null
     source "/opt/adguard/.env"
     set +a
 fi
