@@ -271,7 +271,7 @@ update_adguard_config() {
     if [[ -f "$config_file" && -f "$running_config" ]]; then
         # Compare configurations (excluding dynamic fields)
         local config_diff
-        config_diff=$(diff -u "$running_config" "$config_file" | grep -v "^@@\|^+++\|^---" | grep "^[+-]" | wc -l || echo "0")
+        config_diff=$(diff -u "$running_config" "$config_file" | grep -v "^@@\|^+++\|^---" | grep -c "^[+-]" || echo "0")
 
         if [[ "$config_diff" -gt 0 ]]; then
             warn "Configuration differences detected"
@@ -337,7 +337,7 @@ verify_system_after_update() {
 
     # Check container health
     local unhealthy_containers
-    unhealthy_containers=$(docker ps --filter "health=unhealthy" --format "table {{.Names}}" | grep -v NAMES | wc -l || echo "0")
+    unhealthy_containers=$(docker ps --filter "health=unhealthy" --format "table {{.Names}}" | grep -c -v NAMES || echo "0")
 
     if [[ "$unhealthy_containers" -gt 0 ]]; then
         error "Found $unhealthy_containers unhealthy containers"
