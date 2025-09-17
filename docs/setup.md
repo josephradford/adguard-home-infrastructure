@@ -147,27 +147,7 @@ sudo make install
 tail -f /opt/logs/adguard-install.log
 ```
 
-### Method 2: Cloud-Init Deployment
-
-#### Step 1: Prepare Cloud-Init Configuration
-```bash
-# Edit cloud-init configuration
-nano provisioning/cloud-init/cloud-init.yaml
-
-# Update SSH public key
-# Replace: ssh-rsa YOUR_PUBLIC_KEY_HERE
-```
-
-#### Step 2: Deploy with Cloud-Init
-```bash
-# For cloud providers (AWS, DigitalOcean, etc.)
-# Upload cloud-init.yaml during instance creation
-
-# For bare metal with cloud-init support
-sudo cloud-init -f provisioning/cloud-init/cloud-init.yaml
-```
-
-### Method 3: Manual Installation
+### Method 2: Manual Installation
 
 #### Step 1: System Preparation
 ```bash
@@ -263,12 +243,7 @@ SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
 
-# Optional: Telegram Alerts
-TELEGRAM_BOT_TOKEN=your_bot_token
-TELEGRAM_CHAT_ID=your_chat_id
-
-# Optional: Slack Alerts
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+# Push alerts removed for simplicity
 ```
 
 ### Security Configuration
@@ -367,7 +342,7 @@ user_rules:
 # Test SSH access on new port
 ssh -p 2222 adguard@192.168.1.100
 
-# Disable password authentication (already done in cloud-init)
+# Disable password authentication for security
 sudo nano /etc/ssh/sshd_config
 # Verify: PasswordAuthentication no
 

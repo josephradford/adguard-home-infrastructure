@@ -14,8 +14,8 @@ TEMP_DIR="/tmp/adguard-monitor"
 # Load environment variables
 if [[ -f "/opt/adguard/.env" ]]; then
     set -a
-    # shellcheck source=/opt/adguard/.env
-    source "/opt/adguard/.env"
+    # shellcheck source=/dev/null
+    source /opt/adguard/.env
     set +a
 fi
 

@@ -364,32 +364,8 @@ jobs:
         run: |
           echo "Auditing system security configurations..."
 
-          # Check cloud-init security
-          cloud_init="provisioning/cloud-init/cloud-init.yaml"
-          if [ -f "$cloud_init" ]; then
-            echo "Checking cloud-init security..."
-
-            # Check SSH configuration
-            if grep -q "ssh_pwauth.*false" "$cloud_init"; then
-              echo "✓ Password authentication disabled"
-            else
-              echo "::warning::Consider disabling SSH password authentication"
-            fi
-
-            # Check for firewall configuration
-            if grep -q "ufw" "$cloud_init"; then
-              echo "✓ Firewall configuration found"
-            else
-              echo "::warning::No firewall configuration found in cloud-init"
-            fi
-
-            # Check for automatic updates
-            if grep -q "unattended-upgrades" "$cloud_init"; then
-              echo "✓ Automatic security updates configured"
-            else
-              echo "::warning::Consider enabling automatic security updates"
-            fi
-          fi
+          # Cloud-init deployment removed for simplicity
+          echo "Cloud-init configuration not applicable (deployment method removed)"
 
           # Check fail2ban configuration
           fail2ban_config="configs/fail2ban/jail.d/adguard.conf"
@@ -497,7 +473,6 @@ jobs:
       - name: Send security alert
         env:
           WEBHOOK_URL: ${{ secrets.SECURITY_WEBHOOK_URL }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           message="🚨 SECURITY ALERT: Critical security issues found in AdGuard Infrastructure!\n\nFailed scans:\n"
 
@@ -511,16 +486,9 @@ jobs:
 
           message="$message\nCheck GitHub Actions for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          # Send to security webhook if configured
+          # Send to security webhook if configured (push alerts removed for simplicity)
           if [ -n "$WEBHOOK_URL" ]; then
             curl -X POST -H 'Content-type: application/json' \
               --data "{\"text\":\"$message\"}" \
               "$WEBHOOK_URL"
-          fi
-
-          # Send to Slack if configured
-          if [ -n "$SLACK_WEBHOOK_URL" ]; then
-            curl -X POST -H 'Content-type: application/json' \
-              --data "{\"text\":\"$message\"}" \
-              "$SLACK_WEBHOOK_URL"
           fi

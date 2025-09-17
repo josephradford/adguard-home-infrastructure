@@ -13,7 +13,7 @@ A complete Infrastructure as Code solution for AdGuard Home DNS filtering with c
 - **Complete monitoring stack** (Prometheus, Grafana, Alertmanager)
 - **Security hardening** with UFW firewall and Fail2ban protection
 - **Automated backups** with encryption and retention management
-- **Cloud-init provisioning** for Ubuntu 24.04 LTS
+- **Manual installation** for Ubuntu 24.04 LTS
 - **Container security** with non-root users and read-only filesystems
 
 ### Australian Network Optimization 🇦🇺
@@ -37,7 +37,7 @@ A complete Infrastructure as Code solution for AdGuard Home DNS filtering with c
 - **Automated backup and recovery** procedures
 - **CI/CD pipeline** with security scanning and automated testing
 - **Complete documentation** and troubleshooting guides
-- **Multi-channel alerting** (Email, Slack, Telegram)
+- **Email alerting** with webhook support
 
 ## 📋 System Requirements
 
@@ -114,13 +114,6 @@ nano .env  # Configure your settings
 sudo make install
 ```
 
-### Option 3: Cloud-Init Deployment
-
-```bash
-# Use the cloud-init configuration for automated server provisioning
-# Upload provisioning/cloud-init/cloud-init.yaml to your cloud provider
-# or USB drive for automatic installation
-```
 
 ## ⚙️ Configuration
 
@@ -198,7 +191,7 @@ After installation, access your services:
 
 ### Monitoring & Alerting
 - **24/7 monitoring** of all services and system resources
-- **Multi-channel alerts** (Email, Slack, Telegram)
+- **Email alerts** with webhook integration
 - **Security event detection** and automated response
 - **Performance monitoring** with Australian latency optimization
 

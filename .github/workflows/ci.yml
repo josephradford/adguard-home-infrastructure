@@ -54,12 +54,6 @@ jobs:
           cd docker && docker compose config --quiet
           echo "::endgroup::"
 
-      - name: Validate cloud-init configuration
-        run: |
-          echo "::group::Cloud-init Validation"
-          sudo apt-get install -y cloud-init
-          cloud-init schema --config-file provisioning/cloud-init/cloud-init.yaml
-          echo "::endgroup::"
 
       - name: Check environment template
         run: |
@@ -502,8 +496,9 @@ jobs:
     steps:
       - name: Send notification
         env:
-          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
         run: |
+          # Push alerts removed for simplicity - check GitHub Actions for CI status
           if [ -n "$WEBHOOK_URL" ]; then
             curl -X POST -H 'Content-type: application/json' \
               --data '{"text":"🚨 AdGuard Infrastructure CI failed on main branch! Check GitHub Actions for details."}' \

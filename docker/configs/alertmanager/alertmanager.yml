@@ -105,41 +105,7 @@ receivers:
           X-Priority: '1'
           Importance: 'high'
 
-    # Telegram notification (uncomment and configure if needed)
-    # telegram_configs:
-    #   - bot_token: '${TELEGRAM_BOT_TOKEN}'
-    #     chat_id: '${TELEGRAM_CHAT_ID}'
-    #     message: |
-    #       🚨 *CRITICAL ALERT* 🚨
-    #       {{ range .Alerts }}
-    #       *{{ .Annotations.summary }}*
-    #       {{ .Annotations.description }}
-    #
-    #       Service: `{{ .Labels.service }}`
-    #       Component: `{{ .Labels.component }}`
-    #       {{ end }}
-    #     parse_mode: 'Markdown'
-
-    # Slack notification (uncomment and configure if needed)
-    # slack_configs:
-    #   - api_url: '${SLACK_WEBHOOK_URL}'
-    #     channel: '#alerts'
-    #     username: 'AdGuard-Alertmanager'
-    #     icon_emoji: ':rotating_light:'
-    #     color: 'danger'
-    #     title: 'Critical AdGuard Infrastructure Alert'
-    #     text: |
-    #       {{ range .Alerts }}
-    #       {{ .Annotations.summary }}
-    #       {{ .Annotations.description }}
-    #       {{ end }}
-    #     fields:
-    #       - title: 'Service'
-    #         value: '{{ .CommonLabels.service }}'
-    #         short: true
-    #       - title: 'Component'
-    #         value: '{{ .CommonLabels.component }}'
-    #         short: true
+    # Push alert configurations removed for simplicity
 
   # Security alerts - special handling
   - name: 'security-alerts'
@@ -167,18 +133,7 @@ receivers:
         headers:
           X-Priority: '1'
 
-    # telegram_configs:
-    #   - bot_token: '${TELEGRAM_BOT_TOKEN}'
-    #     chat_id: '${TELEGRAM_CHAT_ID}'
-    #     message: |
-    #       🛡️ *SECURITY ALERT* 🛡️
-    #       {{ range .Alerts }}
-    #       *{{ .Annotations.summary }}*
-    #       {{ .Annotations.description }}
-    #
-    #       Action: `{{ .Annotations.runbook }}`
-    #       {{ end }}
-    #     parse_mode: 'Markdown'
+    # Push alert configurations removed for simplicity
 
   # AdGuard-specific alerts
   - name: 'adguard-alerts'
