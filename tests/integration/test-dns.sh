@@ -442,7 +442,7 @@ test_load() {
     local total_queries=20
 
     # Launch multiple queries in parallel
-    for i in $(seq 1 $total_queries); do
+    for _ in $(seq 1 $total_queries); do
         {
             if dns_query "google.com" >/dev/null 2>&1; then
                 echo "success" >> /tmp/dns_load_test_$$
