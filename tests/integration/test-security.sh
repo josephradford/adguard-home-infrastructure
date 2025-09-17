@@ -387,7 +387,7 @@ test_container_security() {
     local root_containers
     root_containers=$(docker ps --filter "label=com.docker.compose.project=adguard" -q | \
                      xargs docker inspect --format '{{.Name}} {{.Config.User}}' 2>/dev/null | \
-                     grep -E "(root|^[^:]*$)" | wc -l || echo "0")
+                     grep -cE "(root|^[^:]*$)" || echo "0")
 
     # Allow some containers to run as root if necessary (like adguard for port 53)
     if [[ "$root_containers" -le 2 ]]; then
@@ -401,7 +401,7 @@ test_container_security() {
     local host_network_containers
     host_network_containers=$(docker ps --filter "label=com.docker.compose.project=adguard" -q | \
                              xargs docker inspect --format '{{.Name}} {{.HostConfig.NetworkMode}}' 2>/dev/null | \
-                             grep "host" | wc -l || echo "0")
+                             grep -c "host" || echo "0")
 
     if [[ "$host_network_containers" -eq 0 ]]; then
         test_pass "Host network mode"
@@ -414,7 +414,7 @@ test_container_security() {
     local dangerous_mounts
     dangerous_mounts=$(docker ps --filter "label=com.docker.compose.project=adguard" -q | \
                       xargs docker inspect --format '{{range .Mounts}}{{.Source}}:{{.Destination}} {{end}}' 2>/dev/null | \
-                      grep -E "/(etc|usr|bin|sbin|boot|sys|proc):" | wc -l || echo "0")
+                      grep -cE "/(etc|usr|bin|sbin|boot|sys|proc):" || echo "0")
 
     if [[ "$dangerous_mounts" -eq 0 ]]; then
         test_pass "Dangerous volume mounts"
@@ -689,7 +689,7 @@ test_network_penetration() {
     # Test service enumeration
     test_start "Service enumeration protection"
     local service_enum
-    service_enum=$(timeout 20 nmap -sV -p 22,53,${ADGUARD_WEB_PORT} localhost 2>/dev/null | grep -c "version" || echo "0")
+    service_enum=$(timeout 20 nmap -sV -p 22,53,"${ADGUARD_WEB_PORT}" localhost 2>/dev/null | grep -c "version" || echo "0")
 
     if [[ "$service_enum" -lt 2 ]]; then
         test_pass "Service enumeration protection"
@@ -804,7 +804,7 @@ case "${1:-}" in
         exit 0
         ;;
     --timeout)
-        TEST_TIMEOUT="$2"
+        # TEST_TIMEOUT="$2"  # Currently unused but kept for future timeout implementations
         shift 2
         ;;
     *)

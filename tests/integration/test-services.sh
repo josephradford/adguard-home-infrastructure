@@ -11,7 +11,7 @@ TEST_LOG="/tmp/adguard-services-test-$(date +%Y%m%d-%H%M%S).log"
 
 # Test configuration
 TEST_TIMEOUT=30
-MAX_RETRIES=3
+# MAX_RETRIES=3  # Currently unused but available for future retry logic
 HEALTH_CHECK_INTERVAL=5
 
 # Colors for output

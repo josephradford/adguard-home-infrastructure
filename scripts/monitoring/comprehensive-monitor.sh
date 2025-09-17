@@ -190,7 +190,7 @@ monitor_network_security() {
 
     # Check for failed SSH attempts
     local failed_ssh
-    failed_ssh=$(grep "Failed password" /var/log/auth.log 2>/dev/null | grep "$(date '+%b %d')" | wc -l || echo "0")
+    failed_ssh=$(grep "Failed password" /var/log/auth.log 2>/dev/null | grep -c "$(date '+%b %d')" || echo "0")
 
     if [[ "$failed_ssh" -gt "$FAILED_LOGIN_THRESHOLD" ]]; then
         alert "High number of failed SSH attempts today: ${failed_ssh}"
@@ -198,7 +198,7 @@ monitor_network_security() {
 
     # Check listening ports
     local unexpected_ports
-    unexpected_ports=$(netstat -tlnp | grep -v ":53\|:22\|:2222\|:3000\|:3001\|:9090\|:9093\|:9100\|:9617" | grep "LISTEN" | wc -l || echo "0")
+    unexpected_ports=$(netstat -tlnp | grep -v ":53\|:22\|:2222\|:3000\|:3001\|:9090\|:9093\|:9100\|:9617" | grep -c "LISTEN" || echo "0")
 
     if [[ "$unexpected_ports" -gt 0 ]]; then
         warn "Unexpected listening ports detected: ${unexpected_ports}"
@@ -254,7 +254,8 @@ check_file_integrity() {
         if [[ -f "$file" ]]; then
             local file_hash
             file_hash=$(sha256sum "$file" 2>/dev/null | awk '{print $1}')
-            local stored_hash_file="${TEMP_DIR}/$(basename "$file").hash"
+            local stored_hash_file
+            stored_hash_file="${TEMP_DIR}/$(basename "$file").hash"
 
             if [[ -f "$stored_hash_file" ]]; then
                 local stored_hash
@@ -331,7 +332,7 @@ check_log_anomalies() {
 
     for pattern in "${suspicious_patterns[@]}"; do
         local matches
-        matches=$(grep -i "$pattern" /var/log/syslog /var/log/auth.log 2>/dev/null | grep "$(date '+%b %d')" | wc -l || echo "0")
+        matches=$(grep -i "$pattern" /var/log/syslog /var/log/auth.log 2>/dev/null | grep -c "$(date '+%b %d')" || echo "0")
 
         if [[ "$matches" -gt 10 ]]; then
             warn "High number of suspicious log entries for pattern '$pattern': ${matches}"
@@ -341,7 +342,7 @@ check_log_anomalies() {
     # Check AdGuard query logs for suspicious domains
     if [[ -f "/opt/adguard/data/querylog.json" ]]; then
         local suspicious_domains
-        suspicious_domains=$(grep -i "malware\|phishing\|trojan\|botnet\|ransomware" /opt/adguard/data/querylog.json 2>/dev/null | wc -l || echo "0")
+        suspicious_domains=$(grep -ic "malware\|phishing\|trojan\|botnet\|ransomware" /opt/adguard/data/querylog.json 2>/dev/null || echo "0")
 
         if [[ "$suspicious_domains" -gt 5 ]]; then
             alert "High number of malicious domain queries: ${suspicious_domains}"
@@ -384,7 +385,8 @@ send_alerts() {
 
 # Generate health report
 generate_health_report() {
-    local report_file="${REPORT_DIR}/health-$(date '+%Y%m%d-%H%M%S').json"
+    local report_file
+    report_file="${REPORT_DIR}/health-$(date '+%Y%m%d-%H%M%S').json"
 
     {
         echo "{"
