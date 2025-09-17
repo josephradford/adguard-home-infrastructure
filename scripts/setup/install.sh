@@ -165,7 +165,8 @@ install_packages() {
         yamllint \
         ca-certificates \
         gnupg \
-        lsb-release
+        lsb-release \
+        apache2-utils
 
     # Install Docker using official repository
     install_docker
