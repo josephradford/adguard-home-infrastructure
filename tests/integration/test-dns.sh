@@ -13,8 +13,6 @@ ADGUARD_PORT="53"
 
 # Test configuration
 TEST_TIMEOUT=10
-MAX_RETRIES=3
-PARALLEL_TESTS=5
 
 # Colors for output
 RED='\033[0;31m'
@@ -33,7 +31,7 @@ TESTS_SKIPPED=0
 # Load environment if available
 if [[ -f "${PROJECT_ROOT}/.env" ]]; then
     set -a
-    # shellcheck source=./.env
+    # shellcheck source=/dev/null
     source "${PROJECT_ROOT}/.env"
     set +a
 fi

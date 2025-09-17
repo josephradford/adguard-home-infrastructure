@@ -32,7 +32,7 @@ SECURITY_ISSUES=0
 # Load environment if available
 if [[ -f "${PROJECT_ROOT}/.env" ]]; then
     set -a
-    # shellcheck source=./.env
+    # shellcheck source=/dev/null
     source "${PROJECT_ROOT}/.env"
     set +a
 fi

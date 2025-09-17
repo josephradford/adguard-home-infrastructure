@@ -14,7 +14,7 @@ RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
 # Load environment variables
 if [[ -f "${PROJECT_ROOT}/.env" ]]; then
     set -a
-    # shellcheck source=./.env
+    # shellcheck source=/dev/null
     source "${PROJECT_ROOT}/.env"
     set +a
 fi
@@ -386,7 +386,7 @@ cleanup_old_backups() {
     done < <(find "$BACKUP_DIR" -name "adguard-backup-*.tar.gz*" -type f -mtime +"${RETENTION_DAYS}" -print0 2>/dev/null)
 
     # Clean up metadata files
-    find "$BACKUP_DIR" -name "adguard-backup-*.metadata.json" -type f -mtime +${RETENTION_DAYS} -delete 2>/dev/null || true
+    find "$BACKUP_DIR" -name "adguard-backup-*.metadata.json" -type f -mtime +"${RETENTION_DAYS}" -delete 2>/dev/null || true
 
     if [[ $deleted_count -gt 0 ]]; then
         info "Deleted $deleted_count old backup files"
