@@ -14,6 +14,7 @@ RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
 # Load environment variables
 if [[ -f "${PROJECT_ROOT}/.env" ]]; then
     set -a
+    # shellcheck source=./.env
     source "${PROJECT_ROOT}/.env"
     set +a
 fi
@@ -36,7 +37,8 @@ log() {
     local level=$1
     shift
     local message="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     echo -e "${timestamp} [${level}] ${message}" | tee -a "${LOG_FILE}"
 }
 

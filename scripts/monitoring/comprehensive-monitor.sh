@@ -5,7 +5,7 @@
 set -euo pipefail
 
 # Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"  # Currently unused
 LOG_FILE="/opt/logs/security-monitor.log"
 ALERT_FILE="/opt/logs/security-alerts.log"
 REPORT_DIR="/opt/reports"
@@ -14,6 +14,7 @@ TEMP_DIR="/tmp/adguard-monitor"
 # Load environment variables
 if [[ -f "/opt/adguard/.env" ]]; then
     set -a
+    # shellcheck source=/opt/adguard/.env
     source "/opt/adguard/.env"
     set +a
 fi
@@ -25,19 +26,20 @@ CPU_THRESHOLD=80              # CPU usage percentage
 DISK_THRESHOLD=85             # Disk usage percentage
 FAILED_LOGIN_THRESHOLD=10     # Failed login attempts
 
-# Colors and formatting
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# Colors and formatting (currently unused but available for future enhancements)
+# RED='\033[0;31m'
+# GREEN='\033[0;32m'
+# YELLOW='\033[1;33m'
+# BLUE='\033[0;34m'
+# NC='\033[0m'
 
 # Logging functions
 log() {
     local level=$1
     shift
     local message="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     echo "${timestamp} [${level}] ${message}" | tee -a "${LOG_FILE}"
 }
 

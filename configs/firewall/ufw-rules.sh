@@ -19,7 +19,8 @@ log() {
     local level=$1
     shift
     local message="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     echo -e "${timestamp} [${level}] ${message}" | tee -a "${LOG_FILE}"
 }
 
@@ -31,6 +32,7 @@ success() { log "SUCCESS" "${GREEN}$*${NC}"; }
 # Load environment variables if available
 if [[ -f "/opt/adguard/.env" ]]; then
     set -a
+    # shellcheck source=/opt/adguard/.env
     source "/opt/adguard/.env"
     set +a
 fi
