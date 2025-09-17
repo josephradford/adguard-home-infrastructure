@@ -10,9 +10,9 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 TEST_LOG="/tmp/adguard-security-test-$(date +%Y%m%d-%H%M%S).log"
 
 # Test configuration
-TEST_TIMEOUT=30
-MAX_RETRIES=3
-SECURITY_SCAN_TIMEOUT=60
+# TEST_TIMEOUT=30  # Currently unused but available for future timeout implementations
+# MAX_RETRIES=3  # Currently unused but available for future retry logic
+# SECURITY_SCAN_TIMEOUT=60  # Currently unused but available for future timeout implementations
 
 # Colors for output
 RED='\033[0;31m'
@@ -139,7 +139,7 @@ test_network_security() {
     local unexpected_ports=""
 
     for port in $open_ports; do
-        if [[ ! " $expected_ports " =~ " $port " ]] && [[ "$port" != "22" ]]; then
+        if [[ ! " $expected_ports " =~ \ $port\  ]] && [[ "$port" != "22" ]]; then
             unexpected_ports="$unexpected_ports $port"
         fi
     done
@@ -374,7 +374,7 @@ test_container_security() {
     local privileged_containers
     privileged_containers=$(docker ps --filter "label=com.docker.compose.project=adguard" -q | \
                            xargs docker inspect --format '{{.Name}} {{.HostConfig.Privileged}}' 2>/dev/null | \
-                           grep "true" | wc -l || echo "0")
+                           grep -c "true" || echo "0")
 
     if [[ "$privileged_containers" -eq 0 ]]; then
         test_pass "Privileged containers"

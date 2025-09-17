@@ -344,7 +344,7 @@ create_backup_archive() {
 
     # Get backup size
     local backup_size
-    backup_size=$(ls -lh "$archive_file" | awk '{print $5}')
+    backup_size=$(stat -c%s "$archive_file" 2>/dev/null | numfmt --to=iec-i --suffix=B 2>/dev/null || echo "unknown")
 
     success "Backup archive created: $(basename "$archive_file") (${backup_size})"
     info "Backup location: $archive_file"
@@ -383,7 +383,7 @@ cleanup_old_backups() {
     while IFS= read -r -d '' file; do
         rm -f "$file"
         ((deleted_count++))
-    done < <(find "$BACKUP_DIR" -name "adguard-backup-*.tar.gz*" -type f -mtime +${RETENTION_DAYS} -print0 2>/dev/null)
+    done < <(find "$BACKUP_DIR" -name "adguard-backup-*.tar.gz*" -type f -mtime +"${RETENTION_DAYS}" -print0 2>/dev/null)
 
     # Clean up metadata files
     find "$BACKUP_DIR" -name "adguard-backup-*.metadata.json" -type f -mtime +${RETENTION_DAYS} -delete 2>/dev/null || true

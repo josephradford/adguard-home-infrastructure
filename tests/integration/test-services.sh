@@ -10,7 +10,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 TEST_LOG="/tmp/adguard-services-test-$(date +%Y%m%d-%H%M%S).log"
 
 # Test configuration
-TEST_TIMEOUT=30
+# TEST_TIMEOUT=30  # Currently unused but available for future timeout implementations
 # MAX_RETRIES=3  # Currently unused but available for future retry logic
 HEALTH_CHECK_INTERVAL=5
 
