@@ -84,15 +84,17 @@ start: check-env ## Start all services
 .PHONY: stop
 stop: ## Stop all services
 	@echo "$(BLUE)Stopping AdGuard infrastructure services...$(NC)"
-	@cd docker && docker compose down --timeout 30
+	@cd docker && docker compose down --timeout 30 || true
 	@echo "$(BLUE)Cleaning up docker-proxy processes...$(NC)"
-	@sudo pkill -f "docker-proxy.*:$(ADGUARD_WEB_PORT)" 2>/dev/null || true
-	@sudo pkill -f "docker-proxy.*:$(GRAFANA_PORT)" 2>/dev/null || true
-	@sudo pkill -f "docker-proxy.*:$(PROMETHEUS_PORT)" 2>/dev/null || true
-	@sudo pkill -f "docker-proxy.*:$(NODE_EXPORTER_PORT)" 2>/dev/null || true
-	@sudo pkill -f "docker-proxy.*:$(ADGUARD_EXPORTER_PORT)" 2>/dev/null || true
-	@sudo pkill -f "docker-proxy.*:$(ALERTMANAGER_PORT)" 2>/dev/null || true
-	@sudo pkill -f "docker-proxy.*:53" 2>/dev/null || true
+	@set +e; \
+	sudo pkill -f "docker-proxy.*:$(ADGUARD_WEB_PORT)" 2>/dev/null; \
+	sudo pkill -f "docker-proxy.*:$(GRAFANA_PORT)" 2>/dev/null; \
+	sudo pkill -f "docker-proxy.*:$(PROMETHEUS_PORT)" 2>/dev/null; \
+	sudo pkill -f "docker-proxy.*:$(NODE_EXPORTER_PORT)" 2>/dev/null; \
+	sudo pkill -f "docker-proxy.*:$(ADGUARD_EXPORTER_PORT)" 2>/dev/null; \
+	sudo pkill -f "docker-proxy.*:$(ALERTMANAGER_PORT)" 2>/dev/null; \
+	sudo pkill -f "docker-proxy.*:53" 2>/dev/null; \
+	set -e
 	@echo "$(GREEN)Services stopped and cleaned up successfully$(NC)"
 
 .PHONY: restart
@@ -480,14 +482,16 @@ firewall-reset: check-root ## Reset and reconfigure firewall
 .PHONY: cleanup-ports
 cleanup-ports: ## Force cleanup of docker-proxy port conflicts
 	@echo "$(BLUE)Force cleaning up docker-proxy processes...$(NC)"
-	@sudo pkill -f "docker-proxy" 2>/dev/null || true
-	@echo "$(BLUE)Stopping Docker daemon...$(NC)"
-	@sudo systemctl stop docker 2>/dev/null || true
-	@sleep 2
-	@echo "$(BLUE)Starting Docker daemon...$(NC)"
-	@sudo systemctl start docker
-	@echo "$(BLUE)Waiting for Docker to be ready...$(NC)"
-	@timeout 30 bash -c 'until docker info >/dev/null 2>&1; do sleep 1; done' || (echo "$(YELLOW)Docker startup timeout - continuing anyway$(NC)")
+	@set +e; \
+	sudo pkill -f "docker-proxy" 2>/dev/null; \
+	echo "$(BLUE)Stopping Docker daemon...$(NC)"; \
+	sudo systemctl stop docker 2>/dev/null; \
+	sleep 2; \
+	echo "$(BLUE)Starting Docker daemon...$(NC)"; \
+	sudo systemctl start docker; \
+	echo "$(BLUE)Waiting for Docker to be ready...$(NC)"; \
+	timeout 30 bash -c 'until docker info >/dev/null 2>&1; do sleep 1; done' || echo "$(YELLOW)Docker startup timeout - continuing anyway$(NC)"; \
+	set -e
 	@echo "$(GREEN)Port cleanup completed$(NC)"
 
 .PHONY: clean
