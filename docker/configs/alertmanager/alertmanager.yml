@@ -94,7 +94,8 @@ receivers:
           Runbook: {{ .Annotations.runbook }}
 
           Started: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
-          {{ if .EndsAt }}Ended: {{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}{{ end }}
+          {{ if .EndsAt }}Ended: {{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}
+          {{ end }}
 
           Labels:
           {{ range .Labels.SortedPairs }}  - {{ .Name }}: {{ .Value }}
@@ -123,7 +124,8 @@ receivers:
 
           Time: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
 
-          This alert indicates potential security issues that require immediate attention.
+          This alert indicates potential security issues that require
+          immediate attention.
 
           Labels:
           {{ range .Labels.SortedPairs }}  - {{ .Name }}: {{ .Value }}
@@ -212,8 +214,8 @@ mute_time_intervals:
   - name: 'maintenance-window'
     time_intervals:
       - times:
-        - start_time: '03:00'
-          end_time: '05:00'
+          - start_time: '03:00'
+            end_time: '05:00'
         weekdays: ['sunday']
         months: ['1:12']
         location: 'Australia/Sydney'
@@ -222,7 +224,7 @@ mute_time_intervals:
   - name: 'business-hours-only'
     time_intervals:
       - times:
-        - start_time: '09:00'
-          end_time: '17:00'
+          - start_time: '09:00'
+            end_time: '17:00'
         weekdays: ['monday:friday']
         location: 'Australia/Sydney'

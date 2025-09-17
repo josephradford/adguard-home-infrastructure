@@ -17,7 +17,7 @@ alerting:
   alertmanagers:
     - static_configs:
         - targets:
-          - alertmanager:9093
+            - alertmanager:9093
       timeout: 10s
       api_version: v2
 
@@ -94,10 +94,10 @@ scrape_configs:
       module: [dns_tcp]
     static_configs:
       - targets:
-        - 1.1.1.1:53      # Cloudflare
-        - 8.8.8.8:53      # Google
-        - 9.9.9.9:53      # Quad9
-        - 192.168.1.1:53  # Router/Gateway
+          - 1.1.1.1:53      # Cloudflare
+          - 8.8.8.8:53      # Google
+          - 9.9.9.9:53      # Quad9
+          - 192.168.1.1:53  # Router/Gateway
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
