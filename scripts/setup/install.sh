@@ -273,8 +273,14 @@ deploy_containers() {
     # Create data directories with proper permissions
     mkdir -p data/{adguard/{work,conf},prometheus,grafana,alertmanager}
 
+    # Set proper ownership and permissions for all data directories
+    chown -R 1000:1000 data/
+    chmod -R 755 data/
+
     # Copy AdGuard configuration to data directory (writable location)
     cp configs/adguard/AdGuardHome.yaml data/adguard/conf/
+    chown 1000:1000 data/adguard/conf/AdGuardHome.yaml
+    chmod 644 data/adguard/conf/AdGuardHome.yaml
 
     # Generate AdGuard configuration with proper password hash
     if [[ -n "${ADGUARD_PASSWORD:-}" ]]; then
