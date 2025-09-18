@@ -249,6 +249,21 @@ jobs:
           sudo chown 1000:1000 docker/data/adguard/conf/AdGuardHome.yaml
           sudo chmod 644 docker/data/adguard/conf/AdGuardHome.yaml
 
+          # Ensure Prometheus data directory has correct permissions
+          sudo mkdir -p docker/data/prometheus
+          sudo chown -R 1000:1000 docker/data/prometheus
+          sudo chmod -R 755 docker/data/prometheus
+
+          # Ensure Grafana data directory has correct permissions
+          sudo mkdir -p docker/data/grafana
+          sudo chown -R 1000:1000 docker/data/grafana
+          sudo chmod -R 755 docker/data/grafana
+
+          # Ensure Alertmanager data directory has correct permissions
+          sudo mkdir -p docker/data/alertmanager
+          sudo chown -R 1000:1000 docker/data/alertmanager
+          sudo chmod -R 755 docker/data/alertmanager
+
       - name: Start services
         run: |
           cd docker
@@ -267,9 +282,25 @@ jobs:
           docker compose ps
 
           echo "=== Checking for any failing containers ==="
-          if docker compose ps --format json | jq -r '.[] | select(.Health == "unhealthy" or .State == "restarting" or .State == "exited")'; then
-            echo "Found failing containers, showing logs:"
-            docker compose logs --tail=50
+
+          # Show logs for restarting containers
+          restarting=$(docker compose ps --format json | jq -r '.[] | select(.State == "restarting") | .Name' || echo "")
+          if [ -n "$restarting" ]; then
+            echo "Found restarting containers: $restarting"
+            for container in $restarting; do
+              echo "=== Logs for $container ==="
+              docker logs --tail=30 "$container" || true
+            done
+          fi
+
+          # Show logs for exited containers
+          exited=$(docker compose ps --format json | jq -r '.[] | select(.State == "exited") | .Name' || echo "")
+          if [ -n "$exited" ]; then
+            echo "Found exited containers: $exited"
+            for container in $exited; do
+              echo "=== Logs for $container ==="
+              docker logs --tail=30 "$container" || true
+            done
           fi
 
           # Wait for AdGuard to be ready with better error handling
