@@ -164,7 +164,8 @@ services:
     user: "1000:1000"
     tmpfs:
       - /tmp:noexec,nosuid,size=128m
-      - /var/lib/grafana/plugins:noexec,nosuid,size=64m
+      # Temporarily disabled to resolve permission issues
+      # - /var/lib/grafana/plugins:noexec,nosuid,size=64m
     ports:
       - "${GRAFANA_PORT:-3001}:3000"
     volumes:
@@ -177,7 +178,8 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_USERS_ALLOW_ORG_CREATE=false
       - GF_SECURITY_SECRET_KEY=${GRAFANA_SECRET_KEY:-change_this_secret}
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+      # Temporarily disabled to resolve Docker permission issues
+      # - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
       - GF_SERVER_DOMAIN=${STATIC_IP:-192.168.1.100}
       - GF_SERVER_ROOT_URL=http://${STATIC_IP:-192.168.1.100}:${GRAFANA_PORT:-3001}
       - GF_ANALYTICS_REPORTING_ENABLED=false
