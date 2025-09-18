@@ -244,11 +244,10 @@ jobs:
           sudo chmod -R 755 /opt/monitoring/
           sudo chmod -R 755 docker/data/
 
-          # Create initial AdGuard config if it doesn't exist
-          if [ ! -f docker/data/adguard/conf/AdGuardHome.yaml ]; then
-            sudo cp docker/configs/adguard/AdGuardHome.yaml docker/data/adguard/conf/ || true
-            sudo chown 1000:1000 docker/data/adguard/conf/AdGuardHome.yaml || true
-          fi
+          # Copy AdGuard config to data directory (required since we removed the read-only mount)
+          sudo cp docker/configs/adguard/AdGuardHome.yaml docker/data/adguard/conf/
+          sudo chown 1000:1000 docker/data/adguard/conf/AdGuardHome.yaml
+          sudo chmod 644 docker/data/adguard/conf/AdGuardHome.yaml
 
       - name: Start services
         run: |

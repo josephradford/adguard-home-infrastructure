@@ -273,14 +273,14 @@ deploy_containers() {
     # Create data directories with proper permissions
     mkdir -p data/{adguard/{work,conf},prometheus,grafana,alertmanager}
 
-    # Copy configuration files
-    cp -r configs/* data/
+    # Copy AdGuard configuration to data directory (writable location)
+    cp configs/adguard/AdGuardHome.yaml data/adguard/conf/
 
     # Generate AdGuard configuration with proper password hash
     if [[ -n "${ADGUARD_PASSWORD:-}" ]]; then
         local password_hash
         password_hash=$(htpasswd -bnBC 10 "" "${ADGUARD_PASSWORD}" | tr -d ':\n' | sed 's/^[^$]*//')
-        sed -i "s|\$2a\$10\$example_hash_replace_this|${password_hash}|" data/adguard/AdGuardHome.yaml
+        sed -i "s|\$2a\$10\$example_hash_replace_this|${password_hash}|" data/adguard/conf/AdGuardHome.yaml
     fi
 
     # Prepare DNS environment - stop systemd-resolved to free up port 53

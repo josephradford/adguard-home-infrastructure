@@ -7,13 +7,13 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    # cap_drop:
-      # - ALL
+    cap_drop:
+      - ALL
     cap_add:
       - NET_BIND_SERVICE
       - SETGID
       - SETUID
-    # read_only: true
+    read_only: true
     tmpfs:
       - /tmp:noexec,nosuid,size=128m
     ports:
@@ -25,6 +25,7 @@ services:
     volumes:
       - ./data/adguard/work:/opt/adguardhome/work:rw
       - ./data/adguard/conf:/opt/adguardhome/conf:rw
+      - ./configs/adguard/AdGuardHome.yaml:/opt/adguardhome/conf/AdGuardHome.yaml:ro
     environment:
       - TZ=${TZ:-Australia/Sydney}
       - PUID=1000
@@ -62,9 +63,9 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    # cap_drop:
-      # - ALL
-    # read_only: true
+    cap_drop:
+      - ALL
+    read_only: true
     user: "1000:1000"
     ports:
       - "${ADGUARD_EXPORTER_PORT:-9617}:9617"
@@ -101,9 +102,9 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    # cap_drop:
-      # - ALL
-    # read_only: true
+    cap_drop:
+      - ALL
+    read_only: true
     user: "1000:1000"
     tmpfs:
       - /tmp:noexec,nosuid,size=64m
@@ -158,9 +159,9 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    # cap_drop:
-      # - ALL
-    # read_only: true
+    cap_drop:
+      - ALL
+    read_only: true
     user: "1000:1000"
     tmpfs:
       - /tmp:noexec,nosuid,size=128m
@@ -220,9 +221,9 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    # cap_drop:
-      # - ALL
-    # read_only: true
+    cap_drop:
+      - ALL
+    read_only: true
     user: "1000:1000"
     ports:
       - "${NODE_EXPORTER_PORT:-9100}:9100"
@@ -313,9 +314,9 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    # cap_drop:
-      # - ALL
-    # read_only: true
+    cap_drop:
+      - ALL
+    read_only: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
